@@ -1049,7 +1049,6 @@ int main(int argc, char **argv)
     ros::NodeHandle b("~");
     ros::NodeHandle b_pub;
 
-
     n_priv = &b;
     n_pub = &b_pub;
 

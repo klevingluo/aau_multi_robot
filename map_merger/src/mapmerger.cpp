@@ -136,8 +136,8 @@ MapMerger::MapMerger()
 void MapMerger::waitForLocalMetaData()
 {
     //ros::NodeHandle nodeHandle;
-    ROS_INFO("Wait for map_meta_data, on topic:[%s]",local_map_metadata_topic.c_str());
-    ros::Subscriber  sub = nodeHandle->subscribe(local_map_metadata_topic,1000,&MapMerger::callback_map_meta_data_local,this);
+    ROS_INFO("Wait for map, on topic:[%s]",local_map_topic.c_str());
+    ros::Subscriber  sub = nodeHandle->subscribe(local_map_topic,1000,&MapMerger::callback_map_meta_data_local,this);
     while(ros::ok())
     {
        ros::spinOnce();
@@ -340,28 +340,29 @@ void MapMerger::callback_control(const adhoc_communication::MmControlConstPtr &m
     }
 }
 
-void MapMerger::callback_map_meta_data_local(const nav_msgs::MapMetaData::ConstPtr &msg)
+void MapMerger::callback_map_meta_data_local(const nav_msgs::OccupancyGrid::ConstPtr &msg)
 {
     ROS_DEBUG("Got local map meta data");
-    map_width = msg.get()->width;
-    map_height = msg.get()->height;
+    map_width = msg.get()->info.width;
+    map_height = msg.get()->info.height;
+    ROS_INFO("height: %i", msg.get()->info.height);
 
-    g_start_x = msg.get()->origin.position.x;
-    g_start_y = msg.get()->origin.position.y;
+    g_start_x = msg.get()->info.origin.position.x;
+    g_start_y = msg.get()->info.origin.position.y;
 
     if(!has_local_map)
     {
         local_map = new nav_msgs::OccupancyGrid();
-        local_map->info.height = msg.get()->height;
-        local_map->info.width = msg.get()->width;
-        local_map->info.origin.orientation.w = msg.get()->origin.orientation.w;
-        local_map->info.resolution = msg.get()->resolution;
+        local_map->info.height = msg.get()->info.height;
+        local_map->info.width = msg.get()->info.width;
+        local_map->info.origin.orientation.w = msg.get()->info.origin.orientation.w;
+        local_map->info.resolution = msg.get()->info.resolution;
 
         global_map = new nav_msgs::OccupancyGrid();
-        global_map->info.height = msg.get()->height;
-        global_map->info.width = msg.get()->width;
-        global_map->info.origin.orientation.w = msg.get()->origin.orientation.w;
-        global_map->info.resolution = msg.get()->resolution;
+        global_map->info.height = msg.get()->info.height;
+        global_map->info.width = msg.get()->info.width;
+        global_map->info.origin.orientation.w = msg.get()->info.origin.orientation.w;
+        global_map->info.resolution = msg.get()->info.resolution;
 
         for(int i = 0; i < map_height * map_width; i++)
         {
@@ -369,6 +370,48 @@ void MapMerger::callback_map_meta_data_local(const nav_msgs::MapMetaData::ConstP
                         local_map->data.push_back(-1);
         }
     }
+}
+
+void MapMerger::callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
+{
+    ROS_DEBUG("Start callback_map");
+    //get the message
+    nav_msgs::OccupancyGrid tmp = *msg.get();
+    nav_msgs::OccupancyGrid * toInsert = &tmp;
+    //insert it into the list
+    int index_robots = -1;
+    //ROS_INFO("Got map, frame_id:%s|size of data:%i",toInsert->header.frame_id.c_str(),toInsert->data.size());
+    if(toInsert->header.frame_id == local_map_frame_id)
+    {
+        ROS_INFO("case 1");
+        processLocalMap(toInsert,index_robots);
+        force_recompute_all = true;
+        return;
+    }
+    else
+    {
+        ROS_INFO("case 2");
+        for(int i = 0; i < robots->size();i++)
+        {
+            if(robots->at(i)==toInsert->header.frame_id)
+            {
+                index_robots = i;
+                break;
+            }
+        }
+    }
+    if(index_robots == -1)
+    {
+        ROS_WARN("Got map with a not valid frame_id:%s| index_robot == -1| size of data:%lu",toInsert->header.frame_id.c_str(),toInsert->data.size());
+        return;
+    }
+    else
+    {
+        new_data_maps->at(index_robots) = true;
+        ROS_INFO("GOT NOT LOCAL MAP");
+        processMap(toInsert,index_robots);
+    }
+    return;
 }
 
 void MapMerger::callback_global_pub(const ros::TimerEvent &e)
@@ -515,7 +558,7 @@ void MapMerger::callback_recompute_transform(const ros::TimerEvent &e)
     else
     {
         global_map_ready = false;
-        global_map->data.clear();
+        //global_map->data.clear();
         global_map->data.resize(local_map->data.size());
         std::copy(local_map->data.begin(),local_map->data.end(),global_map->data.begin());
         for(int i = 0; i < map_data->size(); i++)
@@ -927,46 +970,6 @@ void MapMerger::callback_map_other(const adhoc_communication::MmMapUpdateConstPt
         }
         return;
     }
-}
-
-void MapMerger::callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
-{
-    ROS_DEBUG("Start callback_map");
-    //get the message
-    nav_msgs::OccupancyGrid tmp = *msg.get();
-    nav_msgs::OccupancyGrid * toInsert = &tmp;
-    //insert it into the list
-    int index_robots = -1;
-    //ROS_INFO("Got map, frame_id:%s|size of data:%i",toInsert->header.frame_id.c_str(),toInsert->data.size());
-    if(toInsert->header.frame_id == local_map_frame_id)
-    {
-        processLocalMap(toInsert,index_robots);
-        force_recompute_all = true;
-        return;
-    }
-    else
-    {
-        for(int i = 0; i < robots->size();i++)
-        {
-            if(robots->at(i)==toInsert->header.frame_id)
-            {
-                index_robots = i;
-                break;
-            }
-        }
-    }
-    if(index_robots == -1)
-    {
-        ROS_WARN("Got map with a not valid frame_id:%s| index_robot == -1| size of data:%lu",toInsert->header.frame_id.c_str(),toInsert->data.size());
-        return;
-    }
-    else
-    {
-        new_data_maps->at(index_robots) = true;
-        ROS_DEBUG("GOT NOT LOCAL MAP");
-        processMap(toInsert,index_robots);
-    }
-    return;
 }
 
 void MapMerger::processLocalMap(nav_msgs::OccupancyGrid * toInsert,int index)

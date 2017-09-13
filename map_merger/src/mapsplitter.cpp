@@ -11,7 +11,7 @@ int main(int argc, char **argv)
     ros::init(argc,argv,"map_splitter");
     string topic;
     ros::NodeHandle n;
-    n.param<string>("/map_splitter/map_topic",topic,"map");
+    n.param<string>("/robot_0/map_splitter/map_topic",topic,"map");
     ROS_INFO("Subscribed Topic: %s",topic.c_str());
 
     ros::Subscriber  sub = n.subscribe(topic,1000,&callback);
@@ -28,11 +28,12 @@ void callback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
     string frame,pub_frame,pub_topic_map,pub_topic_meta;
 
     n.param<int>("/map_splitter/size",size,32);
-    n.param<string>("/map_splitter/map_frame",frame,"map");
-    n.param<string>("/map_splitter/pub_topic_map",pub_topic_map,"map");
-    n.param<string>("/map_splitter/pub_topic_meta",pub_topic_meta,"map_meta");
+    n.param<string>("/robot_0/map_splitter/map_frame",frame,"map");
+    n.param<string>("/map_splitter/pub_topic_map",pub_topic_map,"/robot_0/map");
+    n.param<string>("/map_splitter/pub_topic_meta",pub_topic_meta,"robot_0/map_merger/map_meta");
+
     //ROS_INFO("Wanted mapframe: %s",frame.c_str());
-    n.param<string>("/map_splitter/pub_frame",pub_frame,"map");
+    n.param<string>("/robot_0/map_splitter/pub_frame",pub_frame,"map");
     //ROS_INFO("Published frame: %s",pub_frame.c_str());
     ros::Publisher pub_map = n.advertise<nav_msgs::OccupancyGrid>(pub_topic_map,3);
     ros::Publisher pub_meta = n.advertise<nav_msgs::OccupancyGrid>(pub_topic_meta,3);
@@ -60,7 +61,7 @@ void callback(const nav_msgs::OccupancyGrid::ConstPtr& msg)
     {
         for(int collum = 0; collum < local_map.info.width-size;collum+=size)
         {
-            //ROS_INFO("row:%icollum:%i:",row,collum);
+            ROS_INFO("row:%icollum:%i:",row,collum);
             nav_msgs::OccupancyGrid * t = getMapPart(&local_map,row,collum,size,size);
             int sum_elements = std::accumulate(t->data.begin(),t->data.end(),0);
             if(sum_elements == (-1)* t->data.size())

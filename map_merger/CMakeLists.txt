@@ -101,6 +101,14 @@ target_link_libraries(map_merger ${OpenCV_LIBS} ${catkin_LIBRARIES} )
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(map_merger_node map_merger_generate_messages_cpp)
 add_dependencies(map_merger adhoc_communication_gencpp map_merger_gencpp)
+
+add_executable(map_splitter src/mapsplitter.cpp)
+target_link_libraries(map_splitter ${OpenCV_LIBS} ${catkin_LIBRARIES} )
+## Add cmake target dependencies of the executable/library
+## as an example, message headers may need to be generated before nodes
+# add_dependencies(map_merger_node map_merger_generate_messages_cpp)
+add_dependencies(map_splitter adhoc_communication_gencpp map_merger_gencpp)
+
 ## Specify libraries to link a library or executable target against
 # target_link_libraries(map_merger_node
 # ${catkin_LIBRARIES}

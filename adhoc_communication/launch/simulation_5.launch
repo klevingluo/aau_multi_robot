@@ -1,5 +1,5 @@
-<!-- To make this file work on your system you must change the args of the simulation node (stage) 
--->
+<?xml version="1.0"?> 
+<!-- To make this file work on your system you must change the args of the simulation node (stage) -->
 
 <launch>
 
@@ -12,19 +12,12 @@
 <arg name="enable_cooperative_relaying" default="true"/>
 
 
-<node pkg="adhoc_communication" type="communication_tester" name="robot_output_0"  output="screen" args="-p robot_0 -n" launch-prefix="xterm -e" />
-<node pkg="adhoc_communication" type="communication_tester" name="robot_output_1"  output="screen" args="-p robot_1 -n" launch-prefix="xterm -e" />
-<node pkg="adhoc_communication" type="communication_tester" name="robot_output_2"  output="screen" args="-p robot_2 -n" launch-prefix="xterm -e" />
-<node pkg="adhoc_communication" type="communication_tester" name="robot_output_3"  output="screen" args="-p robot_3 -n" launch-prefix="xterm -e" />
-<node pkg="adhoc_communication" type="communication_tester" name="robot_output_4"  output="screen" args="-p robot_4 -n" launch-prefix="xterm -e" />
-
-
 <node pkg="stage_ros" type="stageros" name="simulation" args="$(find adhoc_communication)/world/sim_world.world" />
 
 
 
 
-<node pkg="adhoc_communication" type="adhoc_communication" name="robot_0">
+<node pkg="adhoc_communication" type="adhoc_communication" name="robot_0" >
 
 	<param name="mac" value="00:11:00:00:00:00"/>
 	<param name="robot_name" value="robot_0"/>
