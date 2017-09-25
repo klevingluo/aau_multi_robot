@@ -787,8 +787,7 @@ void initParams(ros::NodeHandle* n)
     }
 }
 
-bool isReachable(unsigned char mac[6])
-{
+bool isReachable(unsigned char mac[6]) {
     if (simulation_mode)
     {
         PositionSubscriber other_robot;
@@ -820,8 +819,7 @@ bool isReachable(unsigned char mac[6])
             }
         }
 
-    } else if (sim_robot_macs.compare("") != 0)
-    {
+    } else if (sim_robot_macs.compare("") != 0) {
         boost::unique_lock<boost::mutex> lock(mtx_neighbors);
         hostname_mac n(mac);
 
@@ -831,6 +829,7 @@ bool isReachable(unsigned char mac[6])
 
     } else
         return true;
+    return false;
 }
 
 bool connectedWith(unsigned char mac[6])

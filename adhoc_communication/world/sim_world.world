@@ -63,15 +63,12 @@ floorplan
 ( 
   name "willow"
   bitmap "willow-full.pgm"
-  size [54.000 58.700 0.500]
-  pose [ -24.250 28.077 0.000 90.000 ]
+  size [24.000 28.700 0.500]
+  pose [ -10.00 -0.00 0.000 90.000 ]
 )
 
 # throw in a robot
-erratic( pose [ -7.780 23.262 0.000 180.000 ] name "robot_0" color "blue")
-erratic( pose [ -16.263 19.368 0.000 180.000 ] name "robot_1" color "yellow")
-erratic( pose [ -25.277 23.266 0.000 180.000 ] name "robot_2" color "red")
-erratic( pose [ -32.669 24.888 0.000 180.000 ] name "robot_3" color "green")
-erratic( pose [ -40.630 23.006 0.000 180.000 ] name "robot_4" color "pink")
+erratic( pose [ -5.277 3.266 0.000 180.000 ] name "robot_0" color "red")
+erratic( pose [ -21 3.368 0.000 180.000 ] name "robot_1" color "yellow")
 
 

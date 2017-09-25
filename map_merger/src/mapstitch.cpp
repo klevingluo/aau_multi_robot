@@ -24,25 +24,25 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "mapstitch.h"
 #include "math.h"
-//#include "highgui.h"
+#include "highgui.h"
 
+StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, float max_pairwise_distance, cv::Mat oldTransform) {
 
+  // variable that keeps track of whether or not merge is successful
+  works = true;
 
-
-StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, float max_pairwise_distance, cv::Mat oldTransform)
-{
-  // load images, TODO: check that they're grayscale
+  // load images
   image1 = img1.clone();
   image2 = img2.clone();
   if(image1.size != image2.size)
       cv::resize(image2,image2,image1.size());
-  works = true;
+
   // create feature detector set.
   OrbFeatureDetector detector;
   OrbDescriptorExtractor dexc;
   BFMatcher dematc(NORM_HAMMING, false);
 
-  // 1. extract keypoint          s
+  // 1. extract keypoints
   detector.detect(image1, kpv1);
   detector.detect(image2, kpv2);
 
@@ -51,16 +51,17 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   dexc.compute(image2, kpv2, dscv2);
 
   // 3. match keypoints
-  if(kpv1.size() == 0|| kpv2.size() == 0)
-  {
+  if(kpv1.size() == 0|| kpv2.size() == 0) {
       ROS_WARN("No KPV");
       works = false;
       return;
   }
-//  ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries",kpv1.size(),kpv2.size());
+
+  // ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries",kpv1.size(),kpv2.size());
   dematc.match(dscv1, dscv2, matches);
 
   // 4. find matching point pairs with same distance in both images
+  // TODO: figure out why we need to find matching pairs
   for (size_t i=0; i<matches.size(); i++) {
     KeyPoint a1 = kpv1[matches[i].queryIdx],
              b1 = kpv2[matches[i].trainIdx];
@@ -80,12 +81,13 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
         continue;
 
 
+      // points used for matching
       coord1.push_back(a1.pt);
       coord1.push_back(a2.pt);
       coord2.push_back(b1.pt);
       coord2.push_back(b2.pt);
 
-
+      // used for diagnostic purposes
       fil1.push_back(a1);
       fil1.push_back(a2);
       fil2.push_back(b1);
@@ -97,47 +99,43 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
    // cv::imwrite("img2.pgm",image2);
   // 5. find homography
  // ROS_INFO("Found %i matches",matches.size());
-  if(coord1.size() < 1)
-  {
-      ROS_WARN("Problem by transforming map,this migth just an start up problem \n Coord1:%lu",coord1.size());
+  if(coord1.size() < 1) {
+      ROS_WARN("Not enough matching points found, map likely not big enough \n Coord1:%lu",coord1.size());
       works = false;
       return;
   }
 
   ROS_DEBUG("Compute estimateRigid");
-  H = estimateRigidTransform(coord2, coord1,false);
-  if(H.empty())
-  {
+  // TODO figure out why this would fail
+  H = estimateRigidTransform(coord2, coord1, false);
+  if(H.empty()) {
       ROS_WARN("H contain no data, cannot find valid transformation");
       works = false;
       return;
   }
   //ROS_DEBUG("H: size:%lu|empty:%i",H.size,H.empty());
 
+  // 6. sanity checks with user defined parameters
   rotation = 180./M_PI*atan2(H.at<double>(0,1),H.at<double>(1,1));
   transx   = H.at<double>(0,2);
   transy   = H.at<double>(1,2);
   scalex   = sqrt(pow(H.at<double>(0,0),2)+pow(H.at<double>(0,1),2));
   scaley   = sqrt(pow(H.at<double>(1,0),2)+pow(H.at<double>(1,1),2));
   ROS_DEBUG("H: transx:%f|transy%f|scalex:%f,scaley:%f|rotation:%f",transx,transy,scalex,scaley,rotation);
-  //first_x_trans = transx;
-  //first_y_trans = transy;
+
   float scale_change = 0.05;
 
-  if(scalex > 1 + scale_change || scaley > 1 + scale_change)
-  {
+  if(scalex > 1 + scale_change || scaley > 1 + scale_change) {
       ROS_WARN("Map should not scale change is to lagre");
       works = false;
       return;
   }
-  if(scalex < 1 - scale_change|| scaley < 1 - scale_change)
-  {
+  if(scalex < 1 - scale_change|| scaley < 1 - scale_change) {
       ROS_WARN("Map should not scale change is to small");
       works = false;
       return;
   }
-  if(max_trans != -1)
-  {
+  if(max_trans != -1) {
       if(transx > max_trans || transy > max_trans)
       {
           ROS_WARN("Map should not trans so strong");
@@ -154,12 +152,13 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
           return;
       }
   }
+
+  // the current transform, used as a starting point for future transforms
   cur_trans = H;
   ROS_DEBUG("Finished estimateRigid");
   //evaluade transformation
-  //evaluate
-  if(works)
-  {
+  
+  if(works) {
       Mat tmp (image2.size(),image2.type());
       Mat thr;
 
@@ -310,8 +309,7 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
 }
 
 Mat
-StitchedMap::get_debug()
-{
+StitchedMap::get_debug() {
   Mat out;
   drawKeypoints(image1, kpv1, image1, Scalar(255,0,0));
   drawKeypoints(image2, kpv2, image2, Scalar(255,0,0));

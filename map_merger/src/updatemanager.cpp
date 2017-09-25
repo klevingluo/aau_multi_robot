@@ -10,14 +10,14 @@ void updateManager::addNewUpdateList()
     updateInformation->push_back(new std::vector<int>);
 }
 
-void updateManager::addToupdateList(int indexOfMap, std::vector < int > values)
-{
+/// values, for
+void updateManager::addToupdateList(int indexOfMap, std::vector < int > values) {
     ROS_DEBUG("in addToupdateList,indexOfMap:%i,size of values:%lu",indexOfMap,values.size());
     std::vector<int>* tmp = updateInformation->at(indexOfMap);
     ROS_DEBUG("in addToupdateList size tmp:%lu",tmp->size());
+    // don't update if aiready updating
     bool add = true;
-    if(values.size() == 1 && tmp->size() > 1)
-    {
+    if(values.size() == 1 && tmp->size() > 1) {
         int i = tmp->at(tmp->size()-1)+1;
         int j =  values.at(0);
         if(i == j)
@@ -29,8 +29,7 @@ void updateManager::addToupdateList(int indexOfMap, std::vector < int > values)
         }
     }
 
-    if(add)
-    {
+    if(add) {
         {
             for(int i = 0; i < values.size(); i++)
             {

@@ -11,11 +11,7 @@
 <arg name="num_e2e_retrans" default="3"/>
 <arg name="enable_cooperative_relaying" default="true"/>
 
-
 <node pkg="stage_ros" type="stageros" name="simulation" args="$(find adhoc_communication)/world/sim_world.world" />
-
-
-
 
 <node pkg="adhoc_communication" type="adhoc_communication" name="robot_0" >
 

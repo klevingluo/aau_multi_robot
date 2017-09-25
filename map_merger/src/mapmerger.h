@@ -165,6 +165,7 @@ private:
     visualization_msgs::MarkerArray pos_array_my;
     std::vector<int> * pos_seq_other;
     int pos_seq_my;
+    int max_pairwise_distance;
     bool turning;
 };
 
