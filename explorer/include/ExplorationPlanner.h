@@ -1,7 +1,7 @@
 #ifndef PLANNER_H___
 #define PLANNER_H___
 
-#include <ExplorationPlanner.h>
+#include "ExplorationPlanner.h"
 #include <navfn/navfn_ros.h>
 #include "ros/ros.h"
 #include "hungarian.h"
@@ -28,8 +28,8 @@ namespace explorationPlanner
             {
                 int id;
                 int detected_by_robot;  
-                std::string detected_by_robot_str;
-                double robot_home_x;
+                std::string detected_by_robot_str; /** robot this was detected by */
+                double robot_home_x; 
                 double robot_home_y;
                 double x_coordinate;
                 double y_coordinate;
@@ -328,4 +328,5 @@ namespace explorationPlanner
 
 	};
 }
+#endif
 #endif

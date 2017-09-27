@@ -51,14 +51,15 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   dexc.compute(image2, kpv2, dscv2);
 
   // 3. match keypoints
-  if(kpv1.size() == 0|| kpv2.size() == 0) {
-      ROS_WARN("No KPV");
+  // seems to need 450 kpv for a good match - kevin
+  if(kpv1.size() < 450 || kpv2.size() < 450 ) {
+      ROS_WARN("Not enough KPV");
       works = false;
       return;
   }
 
-  // ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries",kpv1.size(),kpv2.size());
   dematc.match(dscv1, dscv2, matches);
+  ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries\t matches: %i",kpv1.size(),kpv2.size(), matches.size());
 
   // 4. find matching point pairs with same distance in both images
   // TODO: figure out why we need to find matching pairs

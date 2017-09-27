@@ -1,16 +1,14 @@
 #include "updatemanager.h"
 
-updateManager::updateManager()
-{
+updateManager::updateManager() {
     updateInformation = new std::vector< std::vector < int > *>();
 }
 
-void updateManager::addNewUpdateList()
-{
+void updateManager::addNewUpdateList() {
     updateInformation->push_back(new std::vector<int>);
 }
 
-/// values, for
+///
 void updateManager::addToupdateList(int indexOfMap, std::vector < int > values) {
     ROS_DEBUG("in addToupdateList,indexOfMap:%i,size of values:%lu",indexOfMap,values.size());
     std::vector<int>* tmp = updateInformation->at(indexOfMap);
@@ -20,8 +18,7 @@ void updateManager::addToupdateList(int indexOfMap, std::vector < int > values) 
     if(values.size() == 1 && tmp->size() > 1) {
         int i = tmp->at(tmp->size()-1)+1;
         int j =  values.at(0);
-        if(i == j)
-        {
+        if(i == j) {
              ROS_DEBUG("FAST %i == %i",i,j);
              tmp->push_back(values.at(0));
              ROS_DEBUG("adding revision number %i, to list at index:%i",values.at(0),indexOfMap);
@@ -31,13 +28,10 @@ void updateManager::addToupdateList(int indexOfMap, std::vector < int > values) 
 
     if(add) {
         {
-            for(int i = 0; i < values.size(); i++)
-            {
-                for(int j = 0; j < tmp->size();j++)
-                {
+            for(int i = 0; i < values.size(); i++) {
+                for(int j = 0; j < tmp->size();j++) {
                     //check if list already contains that update number
-                    if(tmp->at(j) == values.at(i))
-                    {
+                    if(tmp->at(j) == values.at(i)) {
                         add= false;
                         ROS_DEBUG("%i == %i",tmp->at(j),values.at(i));
                         break;

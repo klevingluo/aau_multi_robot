@@ -45,7 +45,7 @@ MapMerger::MapMerger() {
   //ros::nodeHandle nodeHandle ("~");
   nodeHandle = new ros::NodeHandle("~");
   nodeHandle->param<std::string>("robot_name",robot_name,"");
-  if(robot_name.empty() {
+  if(robot_name.empty()) {
     char hostname_c[1024];
     hostname_c[1023] = '\0';
     int status = gethostname(hostname_c, 1023);
@@ -130,13 +130,10 @@ MapMerger::MapMerger() {
   robot_hostname = robot_name;
 
 }
-void MapMerger::waitForLocalMetaData()
-{
-  //ros::NodeHandle nodeHandle;
+void MapMerger::waitForLocalMetaData() {
   ROS_INFO("Wait for map, on topic:[%s]",local_map_topic.c_str());
   ros::Subscriber  sub = nodeHandle->subscribe(local_map_topic,1000,&MapMerger::callback_map_meta_data_local,this);
-  while(ros::ok())
-  {
+  while(ros::ok()) {
     ros::spinOnce();
     ROS_DEBUG("No map_meta information");
     ros::Duration(0.3).sleep();
@@ -144,14 +141,12 @@ void MapMerger::waitForLocalMetaData()
       break;
   }
   ROS_INFO("Got map_meta_data");
-  if(!splitted)
-  {
+  if(!splitted) {
     size = map_height;
   }
 }
 
-void MapMerger::waitForRobotInformation()
-{
+void MapMerger::waitForRobotInformation() {
   ROS_INFO("Wait to get a map from other robot");
   ros::Subscriber sub =nodeHandle->subscribe(robot_prefix+"/adhoc_communication/new_robot",
       1000,&MapMerger::callback_got_robot_for_data,
@@ -206,6 +201,8 @@ void MapMerger::waitForRobotInformation()
   }
 }
 
+/// Called when new robot enters communication range
+// saves the robot's name to robot_name
 void MapMerger::callback_got_robot_for_data(const std_msgs::StringConstPtr &msg) {
   ROS_INFO("Using %s as pseudo local map", msg.get()->data.c_str());
   this->robot_name = msg.get()->data;
@@ -251,7 +248,8 @@ void MapMerger::callback_new_robot(const std_msgs::StringConstPtr &msg) {
 void MapMerger::callback_remove_robot(const std_msgs::StringConstPtr &msg) {
 }
 
-// responds to a map request - kevin I think this is the place to extend for general messages between robots
+// responds to a map request by sending the local map
+// I think this is the place to extend for general messages between robots
 void MapMerger::callback_control(const adhoc_communication::MmControlConstPtr &msg) {
   ROS_DEBUG("Got a control message");
   adhoc_communication::MmControl tmp = *msg.get();
@@ -326,7 +324,7 @@ void MapMerger::callback_control(const adhoc_communication::MmControlConstPtr &m
   }
 }
 
-// updates local map
+// updates local map metadata, should be called only once
 void MapMerger::callback_map_meta_data_local(const nav_msgs::OccupancyGrid::ConstPtr &msg) {
   ROS_DEBUG("Got local map meta data");
   map_width = msg.get()->info.width;
@@ -356,8 +354,10 @@ void MapMerger::callback_map_meta_data_local(const nav_msgs::OccupancyGrid::Cons
   }
 }
 
-void MapMerger::callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
-{
+/// called whenever the local map is updated,
+//  also whenever a new map is received
+//
+void MapMerger::callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg) {
   ROS_DEBUG("Start callback_map");
   //get the message
   nav_msgs::OccupancyGrid tmp = *msg.get();
@@ -369,25 +369,20 @@ void MapMerger::callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg)
     processLocalMap(toInsert,index_robots);
     force_recompute_all = true;
     return;
-  }
-  else {
+  } else {
     ROS_INFO("case 2");
-    for(int i = 0; i < robots->size();i++)
-    {
-      if(robots->at(i)==toInsert->header.frame_id)
-      {
+    for(int i = 0; i < robots->size();i++) {
+      if(robots->at(i)==toInsert->header.frame_id) {
         index_robots = i;
         break;
       }
     }
   }
-  if(index_robots == -1)
-  {
+  if(index_robots == -1) {
     ROS_WARN("Got map with a not valid frame_id:%s| index_robot == -1| size of data:%lu",toInsert->header.frame_id.c_str(),toInsert->data.size());
     return;
   }
-  else
-  {
+  else {
     new_data_maps->at(index_robots) = true;
     ROS_INFO("GOT NOT LOCAL MAP");
     processMap(toInsert,index_robots);
@@ -430,8 +425,7 @@ void MapMerger::callback_global_pub(const ros::TimerEvent &e) {
   if(map_data->size() > 0 && transforms->size() > 0) {
     ROS_DEBUG("Merging other maps into global map in callback_global_pub,sizeTransforms:%lu,sizeRobots:%lu",transforms->size(),robots->size());
     for(int i = 0; i < transforms->size(); i++) {
-      if(new_data_maps->at(findRobotIndex(i)) == false)
-      {
+      if(new_data_maps->at(findRobotIndex(i)) == false) {
         int robotIndex = findRobotIndex(i);
         ROS_DEBUG("Skipping %s,no new Data",robots->at(robotIndex).c_str());
         continue;
@@ -464,8 +458,7 @@ void MapMerger::callback_global_pub(const ros::TimerEvent &e) {
     //todo: clear all near me!
     //cv::Point org_point(map_width / 2 +tmp.pose.position.x / 0.05, map_height / 2 +tmp.pose.position.y / 0.05);
     bool newData = false;
-    for(int i = 0; i < new_data_maps->size(); i++)
-    {
+    for(int i = 0; i < new_data_maps->size(); i++) {
       newData = new_data_maps->at(i);
       if(newData)
         break;
@@ -1081,14 +1074,15 @@ void MapMerger::start()
   ROS_INFO("Init Subscriber");
   pub = nodeHandle->advertise<nav_msgs::OccupancyGrid>("global_map",3);
   my_pos_pub = nodeHandle->advertise<visualization_msgs::MarkerArray>("position_"+robot_name,3);
-  //because i hat to send them in a occupancy grid, i send them as int, so i lose the numbers
-  //after the comma
+  // because i hat to send them in a occupancy grid, i send them as int, so i lose the numbers
+  // after the comma
   // ros::Publisher pub_position = nodeHandle->advertise<geometry_msgs::Pose>("position_over_network",3);
 
   if(seconds_recompute_transform != -1) {
     ROS_INFO("Create timer to recompute the transformations all %i seconds",seconds_recompute_transform);
     recompute_transform_timer = nodeHandle->createTimer(ros::Duration(seconds_recompute_transform),&MapMerger::callback_recompute_transform,this);
   }
+
   global_timer_pub = nodeHandle->createTimer(ros::Duration(seconds_publish_timer),&MapMerger::callback_global_pub,this);
   send_map = nodeHandle->createTimer(ros::Duration(seconds_send_timer),&MapMerger::callback_send_map,this);
   ros::ServiceServer transform_srv = nodeHandle->advertiseService("transformPoint",
@@ -1915,8 +1909,9 @@ void MapMerger::callback_ask_other_robots(const ros::TimerEvent &e) {
           if(newRobotName == robots->at(h))
             cont = true;
         }
-        if(cont)
-          continue;
+        // I think getting rid of this will cause more map updates
+        // if(cont)
+        //  continue;
         robots->push_back(newRobotName);
         ROS_INFO("New robot:%s",newRobotName.c_str());
         updateMan->addNewUpdateList();
@@ -1939,8 +1934,7 @@ void MapMerger::callback_ask_other_robots(const ros::TimerEvent &e) {
       ROS_INFO("No robots are were in the network before me");
     }
   }
-  else
-  {
+  else {
     ROS_WARN("Can't call service to get neighbors");
   }
   ask_other_timer.stop();
