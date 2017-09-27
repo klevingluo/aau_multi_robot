@@ -1,4 +1,4 @@
-#include <ExplorationPlanner.h>
+#include "ExplorationPlanner.h"
 #include "ros/ros.h"
 #include "hungarian.h"
 #include "munkres.h"
@@ -73,8 +73,8 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   free(0), 
   threshold_free(127) , 
   threshold_inflated(252), 
-  threshold_lethal(253),f
-  rontier_id_count(0), 
+  threshold_lethal(253),
+  frontier_id_count(0), 
   exploration_travel_path_global(0), 
   cluster_id(0), 
   initialized_planner(false), 
@@ -3766,7 +3766,7 @@ bool ExplorationPlanner::selectClusterBasedOnAuction(std::vector<double> *goal, 
     std::vector< std::vector<int> > m3 = array_to_matrix(r,3,3);
 
     /* initialize the gungarian_problem using the cost matrix*/
-    Hungrian hungarian(m2, col, row, HUNGARIAN_MODE_MINIMIZE_COST);
+    Hungarian hungarian(m2, col, row, HUNGARIAN_MODE_MINIMIZE_COST);
 
     //        Hungarian hungarian(m3, 3, 3, HUNGARIAN_MODE_MINIMIZE_COST);
 
