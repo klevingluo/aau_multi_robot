@@ -4,7 +4,7 @@
 
 <launch>
 
-  <node pkg="stage_ros" type="stageros" name="simulation" args="$(find adhoc_communication)/world/sim_world.world"/>
+  <node pkg="stage_ros" type="stageros" name="simulation" args="-g $(find adhoc_communication)/world/sim_world.world"/>
 
   <node pkg="adhoc_communication" type="adhoc_communication" name="robot_0" >
     <param name="mac" value="00:11:00:00:00:00"/>
