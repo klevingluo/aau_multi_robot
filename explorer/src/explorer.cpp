@@ -34,7 +34,7 @@
 boost::mutex costmap_mutex;
 
 #define OPERATE_ON_GLOBAL_MAP true		// global or local costmap as basis for exploration
-#define OPERATE_WITH_GOAL_BACKOFF false	// navigate to a goal point which is close to (but not exactly at) selected goal (in case selected goal is too close to a wall)
+#define OPERATE_WITH_GOAL_BACKOFF true	// navigate to a goal point which is close to (but not exactly at) selected goal (in case selected goal is too close to a wall)
 
 void sleepok(int t, ros::NodeHandle &nh) {
   if (nh.ok())
@@ -282,7 +282,8 @@ class Explorer {
           ROS_INFO("****************** EXPLORE ******************");
 
           /*
-           * Use mutex to lock the critical section (access to the costmap)
+           * Use mutex to lock the critical section 
+           * (access to the costmap)
            * since rosspin tries to update the costmap continuously
            */
           costmap_mutex.lock();
@@ -405,7 +406,6 @@ class Explorer {
           else if(frontier_selection == 0)
           {
             exploration->sort(2);
-            exploration->sort(3);
 
             while(true)
             {   
@@ -1280,9 +1280,7 @@ class Explorer {
       return false;              
     }
 
-
     bool navigate(std::vector<double> goal) {
-
       /*
        * If received goal is not empty (x=0 y=0), drive the robot to this point
        * and mark that goal as seen in the last_goal_position vector!!!
@@ -1298,12 +1296,11 @@ class Explorer {
         completed_navigation = move_robot(counter, goal.at(0), goal.at(1));
         rotation_counter = 0;
       }
-      else
-      {
+      else {
         rotation_counter++;
-        //                        ROS_INFO("In navigation .... cluster_available: %lu     counter: %d", clusters_available_in_pool.size(), counter_waiting_for_clusters);
+        // ROS_INFO("In navigation .... cluster_available: %lu     counter: %d", clusters_available_in_pool.size(), counter_waiting_for_clusters);
         ROS_INFO("In navigation .... cluster_available: %lu     counter: %d", exploration->clusters.size(), counter_waiting_for_clusters);			
-        //                        if(clusters_available_in_pool.size() <= 0 || counter_waiting_for_clusters > 10) //(rotation_counter >= 2)
+        // if(clusters_available_in_pool.size() <= 0 || counter_waiting_for_clusters > 10) //(rotation_counter >= 2)
         if(exploration->clusters.size() == 0 || counter_waiting_for_clusters > 10) //(rotation_counter >= 2)
         {
           ROS_INFO("Iterating over GLOBAL COSTMAP to find a goal!!!!");

@@ -64,7 +64,7 @@ MapMerger::MapMerger() {
   nodeHandle->param<int>("seconds_pub_timer",seconds_publish_timer,3);
   nodeHandle->param<int>("seconds_send_timer",seconds_send_timer,5);
   nodeHandle->param<int>("seconds_recompute_transform",seconds_recompute_transform,5);
-  nodeHandle->param<int>("seconds_send_position",seconds_send_position,2);
+  nodeHandle->param<int>("seconds_send_position",seconds_send_position,10);
   nodeHandle->param<double>("max_trans_robots",max_trans_robot,-1);
   nodeHandle->param<double>("max_rotation_robots",max_rotation_robot,5);
 
@@ -494,7 +494,6 @@ void MapMerger::callback_send_position(const ros::TimerEvent &e)
   m.scale.x = 0.2;
   m.scale.y = 0.2;
   m.scale.z = 0.2;
-
 
   m.type = visualization_msgs::Marker::SPHERE;
   m.action = visualization_msgs::Marker::ADD;
