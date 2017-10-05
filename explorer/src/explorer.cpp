@@ -46,9 +46,22 @@ class Explorer {
   public:
 
     Explorer(tf::TransformListener& tf) :
-      counter(0), rotation_counter(0), nh("~"), exploration_finished(false), number_of_robots(1), accessing_cluster(0), cluster_element_size(0),
-      cluster_flag(false), cluster_element(-1), cluster_initialize_flag(false), global_iterattions(0), global_iterations_counter(0), 
-      counter_waiting_for_clusters(0), global_costmap_iteration(0), robot_prefix_empty(false), robot_id(0){
+      counter(0), 
+      rotation_counter(0), 
+      nh("~"), 
+      exploration_finished(false), 
+      number_of_robots(1), 
+      accessing_cluster(0), 
+      cluster_element_size(0),
+      cluster_flag(false), 
+      cluster_element(-1), 
+      cluster_initialize_flag(false), 
+      global_iterattions(0), 
+      global_iterations_counter(0), 
+      counter_waiting_for_clusters(0), 
+      global_costmap_iteration(0), 
+      robot_prefix_empty(false), 
+      robot_id(0){
 
 
         nh.param("frontier_selection",frontier_selection,1); 
@@ -634,15 +647,19 @@ class Explorer {
               }
               ROS_DEBUG("Cluster vector position: %d", cluster_vector_position);
 
+              //k/ cluster vector postion must be less that 0?
               if(cluster_vector_position >= 0)
               {
                 if(exploration->clusters.at(cluster_vector_position).unreachable_frontier_count >= number_unreachable_frontiers_for_cluster)
                 {
                   goal_determined = false;
-                  ROS_WARN("Cluster inoperateable");
-                }else
+                  ROS_WARN(
+                      "too many unreacheachable frontiers in cluster: %i: max: %i", 
+                      exploration->clusters.at(cluster_vector_position).unreachable_frontier_count, 
+                      number_unreachable_frontiers_for_cluster);
+                } else
                 {
-                  ROS_WARN("Cluster operateable");
+                  ROS_DEBUG("Cluster operateable");
                 }
               }
 

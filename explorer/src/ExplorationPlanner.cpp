@@ -1294,6 +1294,7 @@ bool ExplorationPlanner::removeVisitedFrontier(int id, std::string detected_by_r
   }
   return true; 
 }
+
 bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id)
 {
   frontier_t unreachable_frontier;
@@ -4033,6 +4034,7 @@ bool ExplorationPlanner::negotiate_Frontier(double x, double y, int detected_by,
 
   ROS_INFO("Negotiating Frontier with id: %d  at Cluster: %d", id, cluster_id_number);
 
+  // get index of cluster id number
   int cluster_vector_position = 0;
   for (int i = 0; i < clusters.size(); i++)
   {
@@ -4048,7 +4050,7 @@ bool ExplorationPlanner::negotiate_Frontier(double x, double y, int detected_by,
   bool entry_found = false;
   bool id_in_actual_cluster = false;
 
-  for(int i = 0; i< negotiation_list.size(); i++)
+  for(int i = 0; i < negotiation_list.size(); i++)
   {
     for(int k = 0; k < clusters.at(cluster_vector_position).cluster_element.size(); k++)
     {
