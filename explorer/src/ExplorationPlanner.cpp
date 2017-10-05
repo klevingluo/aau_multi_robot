@@ -1295,6 +1295,7 @@ bool ExplorationPlanner::removeVisitedFrontier(int id, std::string detected_by_r
   return true; 
 }
 
+// store a new frontier, mark it as unreachable, then check it it is in any existing clusters, add to unreachable count if so
 bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id)
 {
   frontier_t unreachable_frontier;
@@ -1343,7 +1344,6 @@ bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detect
     {
       if(clusters.at(i).cluster_element.at(j).id == id)
       {
-        ROS_WARN("Increasing cluster unreachable count");
         clusters.at(i).unreachable_frontier_count++;
         break_flag = true; 
         break;
@@ -1351,6 +1351,7 @@ bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detect
     }
     if(break_flag == true)
     {
+      ROS_INFO("unreachable frontier marked in cluster: %i", clusters.at(i).unreachable_frontier_count);
       break;
     }
   }
@@ -4125,7 +4126,6 @@ bool ExplorationPlanner::determine_goal(int strategy, std::vector<double> *final
     {
       if (check_efficiency_of_goal(frontiers.at(i).x_coordinate, frontiers.at(i).y_coordinate) == true)
       {
-        ROS_INFO("------------------------------------------------------------------");
         ROS_INFO("Determined frontier with ID: %d   at x: %f     y: %f   detected by Robot %d", frontiers.at(i).id, frontiers.at(i).x_coordinate, frontiers.at(i).y_coordinate, frontiers.at(i).detected_by_robot);
 
         /*
@@ -4135,7 +4135,7 @@ bool ExplorationPlanner::determine_goal(int strategy, std::vector<double> *final
          * negative either, multiply the coordinate with 0.95 to get 95% of its
          * original value.
          */
-        final_goal->push_back(frontiers.at(i).x_coordinate); //final_goal.push_back(frontiers.at(i).x_coordinate*0.95 - robotPose.getOrigin().getX());
+        final_goal->push_back(frontiers.at(i).x_coordinate); 
         final_goal->push_back(frontiers.at(i).y_coordinate);
         final_goal->push_back(frontiers.at(i).detected_by_robot);
         final_goal->push_back(frontiers.at(i).id);
@@ -4146,14 +4146,12 @@ bool ExplorationPlanner::determine_goal(int strategy, std::vector<double> *final
     }
     return false;
   }
-
   else if(strategy == 2)
   {
     for (int i = 0 + count; i < frontiers.size(); i++)
     {                    
       if (check_efficiency_of_goal(frontiers.at(i).x_coordinate, frontiers.at(i).y_coordinate) == true)
       {
-        ROS_INFO("------------------------------------------------------------------");
         ROS_INFO("Determined frontier with ID: %d   at x: %f     y: %f   detected by Robot %d", frontiers.at(i).id, frontiers.at(i).x_coordinate, frontiers.at(i).y_coordinate, frontiers.at(i).detected_by_robot);
 
         final_goal->push_back(frontiers.at(i).x_coordinate);

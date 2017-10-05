@@ -34,7 +34,8 @@
 boost::mutex costmap_mutex;
 
 #define OPERATE_ON_GLOBAL_MAP true		// global or local costmap as basis for exploration
-#define OPERATE_WITH_GOAL_BACKOFF true	// navigate to a goal point which is close to (but not exactly at) selected goal (in case selected goal is too close to a wall)
+// this is buggy, avoid using
+#define OPERATE_WITH_GOAL_BACKOFF false	// navigate to a goal point which is close to (but not exactly at) selected goal (in case selected goal is too close to a wall)
 
 void sleepok(int t, ros::NodeHandle &nh) {
   if (nh.ok())
@@ -376,7 +377,6 @@ class Explorer {
              */    
             while(true)
             {   
-              goal_determined = exploration->determine_goal(1, &final_goal, count, 0, &robot_str);
               if(goal_determined == false)
               {
                 break;
@@ -423,7 +423,7 @@ class Explorer {
             while(true)
             {   
               goal_determined = exploration->determine_goal(2, &final_goal, count, 0, &robot_str);
-              ROS_DEBUG("Goal_determined: %d   counter: %d",goal_determined, count);
+              ROS_DEBUG("Goal_determined: %d counter: %d",goal_determined, count);
               if(goal_determined == false)
               {
                 break;
@@ -432,14 +432,10 @@ class Explorer {
               {                        
                 //negotiation = exploration->negotiate_Frontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),final_goal.at(3),-1);
                 negotiation = true;
-                if(negotiation == true)
-                {
-                  break;
-                }
+                break;
                 count++;
               }
             }
-
           }
           else if(frontier_selection == 4)
           {
@@ -543,7 +539,6 @@ class Explorer {
                 clusters_available_in_pool.push_back(1);
               }
             }
-
           } 
           else if(frontier_selection == 6)
           {                            
@@ -628,6 +623,7 @@ class Explorer {
 
               int cluster_vector_position = -1;
 
+              // find index of element with id cluster_element
               if(cluster_element != -1)
               {
                 if(exploration->clusters.size() > 0)
@@ -647,7 +643,6 @@ class Explorer {
               }
               ROS_DEBUG("Cluster vector position: %d", cluster_vector_position);
 
-              //k/ cluster vector postion must be less that 0?
               if(cluster_vector_position >= 0)
               {
                 if(exploration->clusters.at(cluster_vector_position).unreachable_frontier_count >= number_unreachable_frontiers_for_cluster)
@@ -738,7 +733,6 @@ class Explorer {
               backoff_sucessfull = true;
             }
           }
-
           if(backoff_sucessfull == true)
           {
             if(OPERATE_WITH_GOAL_BACKOFF == true)
@@ -758,6 +752,8 @@ class Explorer {
           }
 
 
+          //k/ successfully navigated to goal, marking frontier as visited
+          // TODO: what about other frontier points that were scanned?
           if(navigate_to_goal == true && goal_determined == true)
           {
             exploration->calculate_travel_path(exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).x_coordinate, exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).y_coordinate);
@@ -767,10 +763,11 @@ class Explorer {
             ROS_DEBUG("Stored Visited frontier");
 
           }   
+          //k/ failed to navigate to goal, marking frontier as unreachable
           else if(navigate_to_goal == false && goal_determined == true)
           {
-            ROS_DEBUG("Storeing unreachable...");
-            exploration->storeUnreachableFrontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),robot_str.at(0),final_goal.at(3));                            
+            ROS_WARN("failed to navigate: Storing unreachable frontier with id:");
+            exploration->storeUnreachableFrontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),robot_str.at(0),final_goal.at(3)); 
             ROS_DEBUG("Stored unreachable frontier");
           } 
 
@@ -1307,10 +1304,12 @@ class Explorer {
       bool completed_navigation = false;
       if (goal_determined == true) {
         visualize_goal_point(goal.at(0), goal.at(1));
-
         counter++;
         ROS_INFO("GOAL %d:  x: %f      y: %f", counter, goal.at(0), goal.at(1));
         completed_navigation = move_robot(counter, goal.at(0), goal.at(1));
+        if (!completed_navigation) {
+          ROS_WARN("navigation failed:");
+        }
         rotation_counter = 0;
       }
       else {
@@ -1367,6 +1366,7 @@ class Explorer {
             std::vector<double> backoffGoal;
             bool backoff_sucessfull = exploration->smartGoalBackoff(global_goal.at(0),global_goal.at(1), costmap2d_global, &backoffGoal);
 
+            // TODO:  figure out why it looks like unreachable frontiers are stored twice
             if(backoff_sucessfull == true)
             {
               ROS_DEBUG("doing navigation to back-off goal");
@@ -1377,26 +1377,22 @@ class Explorer {
               {
                 exploration->calculate_travel_path(exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).x_coordinate, exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).y_coordinate);
 
-                ROS_INFO("Storing visited...");
+                ROS_WARN("Storing visited...");
                 exploration->storeVisitedFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2),robot_str.at(0), global_goal.at(3)); 
-                ROS_INFO("Stored Visited frontier");
               }   
               else
               {
-                ROS_INFO("Storing unreachable...");
+                ROS_WARN("failed to navigate with backoff: Storing unreachable frontier with id: ");
                 exploration->storeUnreachableFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2),robot_str.at(0), global_goal.at(3));
-                ROS_INFO("Stored unreachable frontier");
               }                          
             }
             else if(backoff_sucessfull == false)
             {
-              ROS_WARN("Navigation to global costmap back-off goal not possible"); 
-              ROS_INFO("Storing as unreachable...");
+              ROS_WARN("Navigation to global costmap back-off goal not possible storing unreachable frontier with id");
               exploration->storeUnreachableFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2), robot_str.at(0), global_goal.at(3));
-              ROS_INFO("Stored unreachable frontier");
             }
           }
-        }else
+        } else
         {
           counter++;
           ROS_INFO("GOAL %d:  rotation", counter);
@@ -1437,6 +1433,8 @@ class Explorer {
 
     }
 
+    // what actually moves the robot through the action client
+    // returns true if the action succeeded, false on abort, 
     bool move_robot(int seq, double position_x, double position_y) {
 
       exploration->next_auction_position_x = position_x;
@@ -1563,7 +1561,7 @@ class Explorer {
           return false;
         }
       }
-      ROS_INFO("ROTATION ACCOMBLISHED");
+      ROS_INFO("ROTATION ACCOMPLISHED");
       return true;
     }
 
