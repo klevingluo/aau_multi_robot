@@ -64,7 +64,6 @@ class Explorer {
       robot_prefix_empty(false), 
       robot_id(0){
 
-
         nh.param("frontier_selection",frontier_selection,1); 
         nh.param("local_costmap/width",costmap_width,0); 
         nh.param<double>("local_costmap/resolution",costmap_resolution,0);
@@ -92,6 +91,7 @@ class Explorer {
         nh.param<int>("wait_for_planner_result",waitForResult,3);
         // determine host name
         nh.param<std::string>("robot_prefix",robot_prefix,"");
+
         ROS_INFO("robot prefix: \"%s\"", robot_prefix.c_str());
 
         //char hostname_c[1024];

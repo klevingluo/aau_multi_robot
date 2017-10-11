@@ -24,7 +24,9 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "mapstitch.h"
 #include "math.h"
-#include "highgui.h"
+#include <opencv2/opencv.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 
 StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, float max_pairwise_distance, cv::Mat oldTransform) {
 
@@ -59,7 +61,10 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   }
 
   dematc.match(dscv1, dscv2, matches);
-  ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries\t matches: %i",kpv1.size(),kpv2.size(), matches.size());
+  ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries\t matches: %i",
+      static_cast<int>(kpv1.size()),
+      static_cast<int>(kpv2.size()), 
+      static_cast<int>(matches.size()));
 
   // 4. find matching point pairs with same distance in both images
   // TODO: figure out why we need to find matching pairs
