@@ -40,13 +40,13 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
       cv::resize(image2,image2,image1.size());
 
   // create feature detector set.
-  OrbFeatureDetector detector;
-  OrbDescriptorExtractor dexc;
+  Ptr<ORB> detector = ORB::create();
+  DescriptorExtractor dexc;
   BFMatcher dematc(NORM_HAMMING, false);
 
   // 1. extract keypoints
-  detector.detect(image1, kpv1);
-  detector.detect(image2, kpv2);
+  detector->detect(image1, kpv1);
+  detector->detect(image2, kpv2);
 
   // 2. extract descriptors
   dexc.compute(image1, kpv1, dscv1);

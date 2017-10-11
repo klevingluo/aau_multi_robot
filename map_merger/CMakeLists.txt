@@ -94,9 +94,14 @@ ${catkin_INCLUDE_DIRS}
 # )
 ## Declare a cpp executable
 # add_executable(map_merger_node src/map_merger_node.cpp)
-find_package(OpenCV 2.4.8 REQUIRED)
+find_package(OpenCV 3 REQUIRED)
+
+message("init for ${OpenCV_VERSION}: ${OpenCV_LIBRARIES}")
+
 add_executable(map_merger src/main.cpp src/mapmerger.cpp src/mapmerger.h src/mapstitch.h src/mapstitch.cpp src/updateentry.cpp src/updateentry.h src/updatemanager.cpp src/updatemanager.h )
+
 target_link_libraries(map_merger ${OpenCV_LIBS} ${catkin_LIBRARIES} )
+
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
 # add_dependencies(map_merger_node map_merger_generate_messages_cpp)
