@@ -24,8 +24,6 @@
 #include <adhoc_communication/SendExpCluster.h>
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/io.hpp>
-//#include <explorer/Frontier.h> //<simple_navigation/Frontier.h>>
-//#include <map_merger/pointFromOtherRobot.h>
 #include <adhoc_communication/MmListOfPoints.h>
 #include <map_merger/TransformPoint.h>
 #include <base_local_planner/trajectory_planner_ros.h>
@@ -124,23 +122,12 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   ssendFrontier = nh_service->serviceClient<adhoc_communication::SendExpFrontier>(sendFrontier_msgs);
   ssendAuction = nh_service->serviceClient<adhoc_communication::SendExpAuction>(sendAuction_msgs);
 
-
-  //    pub_negotion_first = nh_negotiation_first.advertise <adhoc_communication::Frontier> ("negotiation_list_first", 10000);
-
-  //    pub_frontiers = nh_frontier.advertise <adhoc_communication::Frontier> ("frontiers", 10000);
-  //    pub_visited_frontiers = nh_visited_frontier.advertise <adhoc_communication::Frontier> ("visited_frontiers", 10000);
-
   pub_visited_frontiers_points = nh_visited_Point.advertise <visualization_msgs::MarkerArray> ("visitedfrontierPoints", 2000, true);
+
+  pub_clusters = nh.advertise <visualization_msgs::MarkerArray> ("clusters", 200, true);
 
   pub_Point = nh_Point.advertise < geometry_msgs::PointStamped> ("goalPoint", 100, true);
   pub_frontiers_points = nh_frontiers_points.advertise <visualization_msgs::MarkerArray> ("frontierPoints", 2000, true);
-
-  //    pub_auctioning_status = nh_auction_status.advertise<adhoc_communication::AuctionStatus> ("auctionStatus", 1000);
-  //    pub_auctioning_first = nh_auction_first.advertise<adhoc_communication::Auction> ("auction_first", 1000);
-
-  //pub_clusters = nh_cluster.advertise<geometry_msgs::PolygonStamped>("clusters", 2000, true);
-
-
 
   pub_cluster_grid_0 = nh_cluster_grid.advertise<nav_msgs::GridCells>("cluster_grid_0", 2000, true);
   pub_cluster_grid_1 = nh_cluster_grid.advertise<nav_msgs::GridCells>("cluster_grid_1", 2000, true);
@@ -163,59 +150,11 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   pub_cluster_grid_18 = nh_cluster_grid.advertise<nav_msgs::GridCells>("cluster_grid_18", 2000, true);
   pub_cluster_grid_19 = nh_cluster_grid.advertise<nav_msgs::GridCells>("cluster_grid_19", 2000, true);
 
-
-
-
-  //    std::string frontier_sub = robo_name+"/frontiers";
-  //    std::string visited_frontiers_sub = robo_name+"/visited_frontiers";
-  //    std::string auction_sub = robo_name+"/auction";
-  //    std::string all_positions_sub = robo_name+"/all_positions";
-  //    ROS_INFO("Subscribing to: ");
-  //    ROS_INFO("%s  %s  %s  %s", frontier_sub.c_str(), visited_frontiers_sub.c_str(), auction_sub.c_str(), all_positions_sub.c_str());
-
-
-  //    sub_control = nh_control.subscribe("/control", 10000, &ExplorationPlanner::controlCallback, this);
   sub_frontiers = nh_frontier.subscribe(robo_name+"/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
   sub_visited_frontiers = nh_visited_frontier.subscribe(robo_name+"/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
   sub_negotioation = nh_negotiation.subscribe(robo_name+"/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this); 
   sub_auctioning = nh_auction.subscribe(robo_name+"/auction", 1000, &ExplorationPlanner::auctionCallback, this); 
   sub_position = nh_position.subscribe(robo_name+"/all_positions", 1000, &ExplorationPlanner::positionCallback, this);
-
-  // TODO
-  //    sub_robot = nh_robot.subscribe(robo_name+"/adhoc_communication/new_robot", 1000, &ExplorationPlanner::new_robot_callback, this);
-
-
-  //    adhoc_communication::Auction auction_init_status_msg;
-  //    auction_init_status_msg.start_auction = false; 
-  //    auction_init_status_msg.auction_finished = true;
-  //    auction_init_status_msg.auction_status_message = true;
-  //    sendToMulticast("mc_", auction_init_status_msg, "auction");
-  //    
-  //    adhoc_communication::Auction auction_init_msg;
-  //    auction_init_msg.start_auction = false; 
-  //    auction_init_msg.auction_finished = true;
-  //    auction_init_msg.auction_status_message = false;
-  //    sendToMulticast("mc_", auction_init_msg, "auction");
-
-
-
-  //    if(robot_id == 1)
-  //    {
-  //        sub_frontiers = nh_frontier.subscribe("/robot_1/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-  //        sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_1/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-  //        sub_negotioation_first = nh_negotiation_first.subscribe("/robot_0/negotiation_list_first", 10000, &ExplorationPlanner::negotiationCallback, this);
-  //        sub_auctioning_first = nh_auction_first.subscribe("/robot_0/auction_first", 1000, &ExplorationPlanner::auctionCallback, this);
-  //        sub_position = nh_position.subscribe("/robot_1/all_positions", 1000, &ExplorationPlanner::positionCallback, this);
-  //        sub_auctioning_status = nh_auction_status.subscribe("/robot_0/auctionStatus", 1000, &ExplorationPlanner::auctionStatusCallback, this);
-  //    }else if(robot_id == 0)
-  //    {
-  //        sub_frontiers = nh_frontier.subscribe("/robot_0/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-  //        sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_0/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-  //        sub_negotioation_first = nh_negotiation_first.subscribe("/robot_1/negotiation_list_first", 10000, &ExplorationPlanner::negotiationCallback, this);
-  //        sub_auctioning_first = nh_auction_first.subscribe("/robot_1/auction_first", 1000, &ExplorationPlanner::auctionCallback, this);
-  //        sub_position = nh_position.subscribe("/robot_0/all_positions", 1000, &ExplorationPlanner::positionCallback, this);
-  //        sub_auctioning_status = nh_auction_status.subscribe("/robot_1/auctionStatus", 1000, &ExplorationPlanner::auctionStatusCallback, this);
-  //    }
 
   srand((unsigned)time(0));
 }
@@ -234,49 +173,18 @@ void ExplorationPlanner::Callbacks() {
       sub_negotioation = nh_negotiation.subscribe("/robot_0/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
       sub_auctioning = nh_auction.subscribe("/robot_1/auction", 1000, &ExplorationPlanner::auctionCallback, this);
 
-      //                sub_frontiers = nh_frontier.subscribe("/robot_2/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-      //                sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_2/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-      //                sub_negotioation = nh_negotiation.subscribe("/robot_2/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
-      //        
-      //                sub_frontiers = nh_frontier.subscribe("/robot_3/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-      //                sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_3/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-      //                sub_negotioation = nh_negotiation.subscribe("/robot_3/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
-
     }
     else if(robot_name == 0) {
       sub_frontiers = nh_frontier.subscribe("/robot_1/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
       sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_1/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
       sub_negotioation = nh_negotiation.subscribe("/robot_1/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
       sub_auctioning = nh_auction.subscribe("/robot_0/auction", 1000, &ExplorationPlanner::auctionCallback, this);
-      //                sub_frontiers = nh_frontier.subscribe("/robot_2/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-      //                sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_2/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-      //                sub_negotioation = nh_negotiation.subscribe("/robot_2/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
-      //                
-      //                sub_frontiers = nh_frontier.subscribe("/robot_3/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-      //                sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_3/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-      //                sub_negotioation = nh_negotiation.subscribe("/robot_3/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
 
     }
-    //        publish_subscribe_mutex.unlock();
 
     r.sleep();
-    //        ros::spinOnce();     
   }
 }
-
-//void ExplorationPlanner::new_robot_callback(const std_msgs::StringConstPtr &msg)
-//{
-//    std::string newRobotName = msg.get()->data;
-//    for(int i = 0; i < new_robots->size(); i++)
-//    {
-//        if(new_robots->at(i) == newRobotName)
-//        {          
-//            return;
-//        }
-//    }
-//    new_robots.push_back(newRobotName);
-//    ROS_ERROR("New robot:%s",newRobotName.c_str());
-//}
 
 void ExplorationPlanner::initialize_planner(std::string name,
     costmap_2d::Costmap2DROS *costmap, costmap_2d::Costmap2DROS *costmap_global) {
@@ -305,8 +213,9 @@ void ExplorationPlanner::initialize_planner(std::string name,
   unknown = 0, free = 0, lethal = 0, inflated = 0;
 }
 
-
-// write clusters to clusters
+/**
+ * write frontiers from list to clusters
+ */
 bool ExplorationPlanner::clusterFrontiers() {
   int strategy = 1;
   /*
@@ -620,35 +529,49 @@ bool ExplorationPlanner::clusterFrontiers() {
   }   
 }
 
-// Outputs clusters to console
-// TODO: change this to publish to rviz instead of console
+/**
+ * outputs clusters to the rviz console
+ */
 void ExplorationPlanner::visualizeClustersConsole() {
-  ROS_INFO("------------------------------------------------------------------");
+  visualization_msgs::MarkerArray clustersArray;
+
   for(int j = 0; j < clusters.size(); j++) {
+
+    double color_r = (double)rand() / RAND_MAX;
+    double color_g = (double)rand() / RAND_MAX;    
+    double color_b = (double)rand() / RAND_MAX;
+
     for(int n = 0; n < clusters.at(j).cluster_element.size(); n++) {
-      if(robot_prefix_empty_param == true) {
-        ROS_INFO("ID: %6d  x: %5.2f  y: %5.2f  cluster: %5d   robot: %s", clusters.at(j).cluster_element.at(n).id, clusters.at(j).cluster_element.at(n).x_coordinate, clusters.at(j).cluster_element.at(n).y_coordinate, clusters.at(j).id, clusters.at(j).cluster_element.at(n).detected_by_robot_str.c_str());
-      } else {
-        ROS_INFO("ID: %6d  x: %5.2f  y: %5.2f  cluster: %5d   dist: %d", clusters.at(j).cluster_element.at(n).id, clusters.at(j).cluster_element.at(n).x_coordinate, clusters.at(j).cluster_element.at(n).y_coordinate, clusters.at(j).id, clusters.at(j).cluster_element.at(n).dist_to_robot);
-      }            
+      visualization_msgs::Marker marker;
+
+      marker.header.frame_id = move_base_frame;    
+      marker.header.stamp = ros::Time::now();
+      marker.header.seq = frontier_seq_number++;
+      marker.ns = "clusters";
+      marker.id = frontier_seq_number;
+      marker.type = visualization_msgs::Marker::SPHERE;
+      marker.action = visualization_msgs::Marker::ADD;
+      marker.pose.position.x = clusters.at(j).cluster_element.at(n).x_coordinate;
+      marker.pose.position.y = clusters.at(j).cluster_element.at(n).y_coordinate;
+      marker.pose.position.z = 0;
+      marker.pose.orientation.x = 0.0;
+      marker.pose.orientation.y = 0.0;
+      marker.pose.orientation.z = 0.0;
+      marker.pose.orientation.w = 1.0;
+      marker.scale.x = 0.2;
+      marker.scale.y = 0.2;
+      marker.scale.z = 0.2;
+
+      marker.color.a = 1.0;
+      marker.color.r = color_r;
+      marker.color.g = color_g;
+      marker.color.b = color_b;               
+
+      clustersArray.markers.push_back(marker);              
     }           
   }
-  ROS_INFO("------------------------------------------------------------------");
+  pub_clusters.publish <visualization_msgs::MarkerArray>(clustersArray);
 }
-
-//std::string ExplorationPlanner::lookupRobotName(int robot_name_int)
-//{
-//    if(robot_name_int == 0)
-//        return ("turtlebot");
-//    if(robot_name_int == 1)
-//        return ("joy");
-//    if(robot_name_int == 2)
-//        return ("marley");
-//    if(robot_name_int == 3)
-//        return ("bob"); 
-//    if(robot_name_int == 4)
-//        return ("hans"); 
-//}
 
 // writes all points from fontiers to
 // transformedPointsFromOtherRobot_frontiers
@@ -1101,6 +1024,9 @@ void ExplorationPlanner::home_position_(const geometry_msgs::PointStamped::Const
   home_position_y_ = msg.get()->point.y;
 }
 
+/*
+ * output the frontiers to the console
+ */
 void ExplorationPlanner::printFrontiers() {
   for(int i = 0; i < frontiers.size(); i++) {
     if(robot_prefix_empty_param == true) {
@@ -1396,21 +1322,7 @@ bool ExplorationPlanner::removeUnreachableFrontier(int id, std::string detected_
 
 bool ExplorationPlanner::publish_negotiation_list(frontier_t negotiation_frontier, int cluster_number)
 {
-  //    ROS_ERROR("Publish negotiation list!!!!!!!!!!!!!!!!");
   adhoc_communication::ExpFrontier negotiation_msg;
-
-  //    for(int i = 0; i<negotiation_list.size(); i++)
-  //    {
-  //        adhoc_communication::FrontierElement negotiation_element;
-  //        negotiation_element.detected_by_robot = negotiation_list.at(i).detected_by_robot;
-  //        negotiation_element.x_coordinate = negotiation_list.at(i).x_coordinate;
-  //        negotiation_element.y_coordinate = negotiation_list.at(i).y_coordinate;
-  //        negotiation_element.id = negotiation_list.at(i).id;
-  //
-  //        negotiation_msg.frontier_element.push_back(negotiation_element);
-  ////        pub_negotion.publish(negotiation_msg);
-  //        sendToMulticast("mc_",negotiation_msg, "negotiation_list");
-  //    }
 
   if(cluster_number != -1)
   {
@@ -1593,77 +1505,6 @@ void ExplorationPlanner::negotiationCallback(const adhoc_communication::ExpFront
     }
   }
 }
-
-
-//void ExplorationPlanner::auctionStatusCallback(const adhoc_communication::AuctionStatus::ConstPtr& msg)
-//{
-//    ROS_INFO("Calling AuctionStatusCallback");
-//    
-//    auction_start = msg.get()->start_auction;
-//    auction_finished = msg.get()->auction_finished;
-//    adhoc_communication::Cluster occupied_ids;
-//    std::vector<int> requested_cluster_ids;
-//    
-//    /*
-//     * Visualizing the received message
-//     */
-////    for(int i = 0; i < msg.get()->requested_clusters.size(); i++)
-////    {
-////        adhoc_communication::Cluster cluster_req; 
-////        cluster_req = msg.get()->requested_clusters.at(i);
-////        ROS_INFO("------------------- RECEIVED REQUEST %d ----------------------", i);
-////        std::string requested_clusters;
-////        for(int j = 0; j < cluster_req.ids_contained.size(); j++)
-////        {
-////            requested_clusters.append(NumberToString((int)cluster_req.ids_contained.at(j)));
-////            requested_clusters.append(", ");
-////        }
-////        ROS_INFO("Received auction with auction number: %d", msg.get()->auction_id);
-////        ROS_INFO("Received requested ids: %s", requested_clusters.c_str());
-////    }
-//    
-//    /*
-//     * Cluster all available frontiers to be able to compare clusters
-//     * with other robots
-//     */
-//    clusterFrontiers();
-//    
-//    if(msg.get()->occupied_ids.size() > 0 || msg.get()->requested_clusters.size() > 0)
-//    {
-//        for(int i = 0; i < msg.get()->occupied_ids.size(); i++)
-//        {
-//            occupied_ids.ids_contained.push_back(msg.get()->occupied_ids.at(i));
-//        }
-//        int occupied_cluster_id = checkClustersID(occupied_ids);     
-//        if(occupied_cluster_id >=0)
-//        {
-//            already_used_ids.push_back(occupied_cluster_id);
-//        }      
-////        ROS_INFO("Requested cluster size: %lu", msg.get()->requested_clusters.size());
-//        for(int i = 0; i < msg.get()->requested_clusters.size(); i++)
-//        {
-//            adhoc_communication::Cluster requested_cluster,requested_ids; 
-//            
-//            requested_cluster = msg.get()->requested_clusters.at(i);
-////            ROS_INFO("IDS_contained: %lu",requested_cluster.ids_contained.size());
-//            
-////            for(int j = 0; j < requested_cluster.ids_contained.size(); j++)
-////            {
-//////                ROS_INFO("received ids: %d", requested_cluster.ids_contained.at(j));
-////                requested_ids.ids_contained.push_back(requested_cluster.ids_contained.at(j));
-////            }
-////            ROS_INFO("----------------------------------------------------------");
-//            requested_cluster_ids.push_back(checkClustersID(requested_cluster));
-//        }   
-//    }
-//    
-//    
-//    if(auction_start == true)
-//    {
-//        start_thr_auction = true;
-//        thr_auction_status = boost::thread(&ExplorationPlanner::respondToAuction, this, requested_cluster_ids);
-//    }
-//}
 
 bool ExplorationPlanner::respondToAuction(std::vector<requested_cluster_t> requested_cluster_ids, int auction_id_number) {   
   //    ros::Rate r(1);
