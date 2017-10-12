@@ -21,7 +21,6 @@
 #include <boost/thread/mutex.hpp>
 #include <iostream>
 #include <navfn/navfn_ros.h>
-//#include <sound_play/sound_play.h>
 #include <boost/filesystem.hpp>
 #include <map_merger/LogMaps.h>
 
@@ -34,8 +33,6 @@
 boost::mutex costmap_mutex;
 
 #define OPERATE_ON_GLOBAL_MAP true		// global or local costmap as basis for exploration
-// this is buggy, avoid using
-#define OPERATE_WITH_GOAL_BACKOFF false	// navigate to a goal point which is close to (but not exactly at) selected goal (in case selected goal is too close to a wall)
 
 void sleepok(int t, ros::NodeHandle &nh) {
   if (nh.ok())
@@ -70,9 +67,7 @@ class Explorer {
         nh.param("number_unreachable_for_cluster", number_unreachable_frontiers_for_cluster,3);
 
         ROS_INFO("Costmap width: %d", costmap_width);
-        //                frontier_selection = atoi(param.c_str());
         ROS_INFO("Frontier selection is set to: %d", frontier_selection);
-        //frontier_selection = 3;
         Simulation = false;      
 
         //#ifdef PROFILE
@@ -83,15 +78,10 @@ class Explorer {
 
         srand((unsigned)time(0));
 
-        //		sound_play::SoundClient sc;
-        //              sleepok(0.5, nh);
-        //		sc.say("Hello    World   I    am    Turtlebot");
-
         nh.param<std::string>("move_base_frame",move_base_frame,"map");  
         nh.param<int>("wait_for_planner_result",waitForResult,3);
         // determine host name
         nh.param<std::string>("robot_prefix",robot_prefix,"");
-
         ROS_INFO("robot prefix: \"%s\"", robot_prefix.c_str());
 
         //char hostname_c[1024];
@@ -164,10 +154,6 @@ class Explorer {
         initLogPath();
         csv_file = log_path + std::string("periodical.log");
         log_file = log_path + std::string("exploration.log"); 
-
-        ROS_DEBUG("*********************************************");
-        ROS_INFO("******* Initializing Simple Navigation ******");
-        ROS_DEBUG("                                             ");
 
         ROS_DEBUG("Creating global costmap ...");
         costmap2d_global = new costmap_2d::Costmap2DROS("global_costmap", tf);
@@ -246,7 +232,6 @@ class Explorer {
 
         exploration->setRobotConfig(robot_id, robot_home_position_x, robot_home_position_y, move_base_frame);
 
-        ROS_INFO("                                             ");
         ROS_INFO("************* INITIALIZING DONE *************");
 
       }
@@ -254,25 +239,8 @@ class Explorer {
 
     void explore() 
     {
-      /*
-       * Sleep is required to get the actual 
-       * costmap updated with obstacle and inflated 
-       * obstacle information. This is rquired for the
-       * first time explore() is called.
-       */
-      ROS_DEBUG("Sleeping 5s for costmaps to be updated.");
-      geometry_msgs::Twist twi;
-      //should be a parameter!! only for testing on Wed/17/9/14
-      ros::Publisher twi_publisher = nh.advertise<geometry_msgs::Twist>("/Rosaria/cmd_vel",3);
-      twi.angular.z = 0.75;
-      twi_publisher.publish(twi);
-      ros::Duration(5.0).sleep();
-      twi_publisher.publish(twi);
-      /*
-       * START TAKING THE TIME DURING EXPLORATION     
-       */
+      // START TAKING THE TIME DURING EXPLORATION     
       time_start = ros::Time::now();
-
 
       while (exploration_finished == false) 
       {
@@ -286,10 +254,9 @@ class Explorer {
            */
 
           std::vector<double> final_goal;
-          std::vector<double> backoffGoal;
           std::vector<std::string> robot_str;
 
-          bool backoff_sucessfull = false, navigate_to_goal = false;
+          bool navigate_to_goal = false;
           bool negotiation;
           int count = 0;
 
@@ -723,34 +690,9 @@ class Explorer {
 
           if(goal_determined == true)
           {
-            if(OPERATE_WITH_GOAL_BACKOFF == true)
-            {
-              ROS_DEBUG("Doing smartGoalBackoff");
-              backoff_sucessfull = exploration->smartGoalBackoff(final_goal.at(0),final_goal.at(1), costmap2d_global, &backoffGoal);   
-            }
-            else
-            {
-              backoff_sucessfull = true;
-            }
-          }
-          if(backoff_sucessfull == true)
-          {
-            if(OPERATE_WITH_GOAL_BACKOFF == true)
-            {
-              ROS_INFO("Doing navigation to backoff goal");
-              navigate_to_goal = navigate(backoffGoal);
-            }else
-            {
-              ROS_INFO("Doing navigation to goal");
-              navigate_to_goal = navigate(final_goal);
-            }
-          }
-          else if(backoff_sucessfull == false && goal_determined == false)
-          {
+            ROS_INFO("Doing navigation to goal");
             navigate_to_goal = navigate(final_goal);
-            goal_determined = false;
           }
-
 
           //k/ successfully navigated to goal, marking frontier as visited
           // TODO: what about other frontier points that were scanned?
@@ -782,8 +724,6 @@ class Explorer {
         {
           ROS_WARN("No navigation performed");				
         }		
-        ROS_DEBUG("                                             ");
-        ROS_DEBUG("                                             ");
       }
     }         
 
@@ -1359,38 +1299,10 @@ class Explorer {
             //                                {
             //                                    ROS_INFO("No Goal determined on GLOBAL COSTMAP for the %d time. Still wait ...", global_iterations_counter);
             //                                }
-          }else
+          } else
           {
-            counter++;
-            ROS_INFO("GOAL %d:  x: %f      y: %f", counter, global_goal.at(0), global_goal.at(1));
-            std::vector<double> backoffGoal;
-            bool backoff_sucessfull = exploration->smartGoalBackoff(global_goal.at(0),global_goal.at(1), costmap2d_global, &backoffGoal);
-
-            // TODO:  figure out why it looks like unreachable frontiers are stored twice
-            if(backoff_sucessfull == true)
-            {
-              ROS_DEBUG("doing navigation to back-off goal");
-              visualize_goal_point(backoffGoal.at(0), backoffGoal.at(1));
-              completed_navigation = move_robot(counter, backoffGoal.at(0), backoffGoal.at(1));
-              rotation_counter = 0;
-              if(completed_navigation == true)
-              {
-                exploration->calculate_travel_path(exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).x_coordinate, exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).y_coordinate);
-
-                ROS_WARN("Storing visited...");
-                exploration->storeVisitedFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2),robot_str.at(0), global_goal.at(3)); 
-              }   
-              else
-              {
-                ROS_WARN("failed to navigate with backoff: Storing unreachable frontier with id: ");
-                exploration->storeUnreachableFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2),robot_str.at(0), global_goal.at(3));
-              }                          
-            }
-            else if(backoff_sucessfull == false)
-            {
-              ROS_WARN("Navigation to global costmap back-off goal not possible storing unreachable frontier with id");
-              exploration->storeUnreachableFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2), robot_str.at(0), global_goal.at(3));
-            }
+            ROS_WARN("failed to navigate Storing unreachable frontier with id: ");
+            exploration->storeUnreachableFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2),robot_str.at(0), global_goal.at(3));
           }
         } else
         {
@@ -1492,19 +1404,6 @@ class Explorer {
           exploration->next_auction_position_y = robotPose.getOrigin().getY();
           return false;
         }
-        /*
-           double my_time = ros::Time::now().toSec();
-        //ROS_ERROR("my_time: %f     timeout: %f",my_time,timeout);
-        if(my_time >= timeout)
-        {
-        ROS_ERROR("Timeout exceeded");
-        break;
-        }
-        if(ac.getState() == actionlib::SimpleClientGoalState::PREEMPTED){ROS_ERROR("PREEMPTED");}
-        if(ac.getState() == actionlib::SimpleClientGoalState::ABORTED){ROS_ERROR("ABORTED");}
-        if(ac.getState() == actionlib::SimpleClientGoalState::REJECTED){ROS_ERROR("REJECTED");}
-        if(ac.getState() == actionlib::SimpleClientGoalState::RECALLED){ROS_ERROR("RECALLED");}
-        */
       }
       ROS_INFO("TARGET REACHED");
 
