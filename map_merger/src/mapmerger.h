@@ -57,7 +57,6 @@ public:
                            map_merger::TransformPoint::Response &res);
     bool log_output_srv(map_merger::LogMaps::Request &req,
                         map_merger::LogMaps::Response &res);
-    bool getHasLocalMap();
 private:
     //Private Methods
     //callback methods
@@ -74,7 +73,6 @@ private:
     void callback_got_position_network(const adhoc_communication::MmRobotPosition::ConstPtr &msg);
     void callback_new_robot(const std_msgs::StringConstPtr &msg);
     void callback_ask_other_robots(const ros::TimerEvent &e);
-    void callback_remove_robot(const std_msgs::StringConstPtr &msg);
 
     void callback_write_maps(const ros::TimerEvent &e);
 
@@ -87,8 +85,7 @@ private:
     void callback_got_robot_for_data(const std_msgs::StringConstPtr &msg);
     void sendControlMessage(std::vector<int>* updateNumbers,std::string dest);
 
-    void processMap(nav_msgs::OccupancyGrid *map,int index_in_mapdata);
-    void processLocalMap(nav_msgs::OccupancyGrid * toInsert,int index);
+    void processLocalMap(nav_msgs::OccupancyGrid * toInsert);
     void processPosition(geometry_msgs::PoseStamped * pose);
 
     void updateMap(nav_msgs::OccupancyGrid *mapToUpdate,int index_of_transform);

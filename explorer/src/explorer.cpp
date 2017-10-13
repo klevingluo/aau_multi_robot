@@ -1278,12 +1278,6 @@ int main(int argc, char **argv) {
 
   boost::thread thr_explore(boost::bind(&Explorer::explore, &simple));	
 
-  /*
-   * FIXME
-   * Which rate is required in order not to oversee
-   * any callback data (frontiers, negotiation ...)
-   */
-  //        ros::Rate r(5); // FIXME 30
   while (ros::ok()) {
 
     costmap_mutex.lock(); 

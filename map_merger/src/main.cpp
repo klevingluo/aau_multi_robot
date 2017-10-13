@@ -38,10 +38,7 @@ int main(int argc, char **argv)
 #endif
     ros::init(argc,argv,"map_merger");
     MapMerger *merger = new MapMerger();
-    if(merger->getHasLocalMap())
-        merger->waitForLocalMetaData();
-    else
-        merger->waitForRobotInformation();
+    merger->waitForLocalMetaData();
     merger->start();
 #ifdef PROFILE
     HeapProfilerStop();
