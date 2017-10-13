@@ -24,13 +24,6 @@
 
 boost::mutex costmap_mutex;
 
-#define OPERATE_ON_GLOBAL_MAP true		// global or local costmap as basis for exploration
-
-void sleepok(int t, ros::NodeHandle &nh) {
-  if (nh.ok())
-    ros::Duration(1.0).sleep();
-}
-
 class Explorer {
 
   public:
@@ -71,11 +64,6 @@ class Explorer {
 
         ROS_INFO("robot prefix: \"%s\"", robot_prefix.c_str());
 
-        //char hostname_c[1024];
-        //hostname_c[1023] = '\0';
-        //gethostname(hostname_c, 1023);
-        //robot_name = std::string(hostname_c);
-
         // create map_merger service
         std::string service = robot_prefix + std::string("/map_merger/logOutput");
         mm_log_client = nh.serviceClient<map_merger::LogMaps>(service.c_str());
@@ -114,7 +102,7 @@ class Explorer {
 
           robot_prefix_empty = true;
           ROS_INFO("Robot name: %s    robot_id: %d", robot_name.c_str(), robot_id);
-        }else
+        } else
         {
           robot_name = robot_prefix;
           ROS_INFO("Move_base_frame: %s",move_base_frame.c_str());               
@@ -133,60 +121,25 @@ class Explorer {
         csv_file = log_path + std::string("periodical.log");
         log_file = log_path + std::string("exploration.log"); 
 
-        ROS_INFO("******* Initializing Simple Navigation ******");
-
         ROS_DEBUG("Creating global costmap ...");
         costmap2d_global = new costmap_2d::Costmap2DROS("global_costmap", tf);
         ROS_DEBUG("Global costmap created ... now performing costmap -> pause");
         costmap2d_global->pause();
         ROS_DEBUG("Pausing performed");
 
-        if(OPERATE_ON_GLOBAL_MAP == true)
-        {
-          costmap2d_local_size = new costmap_2d::Costmap2DROS("local_costmap", tf);
-          costmap2d_local_size->pause();
-          ROS_DEBUG("Starting Global costmap ...");
-          costmap2d_global->start();
-          costmap2d_local_size->start();
+        costmap2d_local_size = new costmap_2d::Costmap2DROS("local_costmap", tf);
+        costmap2d_local_size->pause();
+        ROS_DEBUG("Starting Global costmap ...");
+        costmap2d_global->start();
+        costmap2d_local_size->start();
 
-          costmap2d_local = costmap2d_global;                   
-        }
-        else
-        {
-          ROS_INFO("Creating local costmap ...");
-          costmap2d_local = new costmap_2d::Costmap2DROS("local_costmap", tf);
-          ROS_INFO("Local costmap created ... now performing costmap -> pause");
-          costmap2d_local->pause();
-          ROS_INFO("Pausing performed");
-          ROS_INFO("Cost maps created");
-
-
-          ROS_INFO("Starting Global costmap ...");
-          costmap2d_global->start();
-          ROS_INFO("Starting Local costmap ... ");
-          costmap2d_local->start();
-          ROS_INFO("BOTH COSTMAPS STARTED AND RUNNING ...");
-        }
-
-        /*
-         * Set the first goal as PointStamped message to visualize in RVIZ.
-         * RVIZ requires a minimal history length of 1, which means that at least
-         * one entry has to be buffered, before the first Goal is able to be
-         * visualized. Therefore set the "first" goal to the point of origin
-         * (home position).
-         */
+        costmap2d_local = costmap2d_global;                   
 
         if (!costmap2d_local->getRobotPose(robotPose)) {
           ROS_ERROR("Failed to get RobotPose");
         }
         visualize_goal_point(robotPose.getOrigin().getX(),
             robotPose.getOrigin().getY());
-
-        // transmit three times, since rviz need at least 1 to buffer before visualizing the point
-        for (int i = 0; i <= 2; i++) {
-          visualize_home_point();
-        }
-
 
         // instantiate the planner
         exploration = new explorationPlanner::ExplorationPlanner(robot_id, robot_prefix_empty, robot_name);
@@ -219,11 +172,6 @@ class Explorer {
 
       while (exploration_finished == false) 
       {
-        /*
-         * *****************************************************
-         * FRONTIER DETERMINATION
-         * *****************************************************
-         */
 
         std::vector<double> final_goal;
         std::vector<std::string> robot_str;
@@ -231,8 +179,6 @@ class Explorer {
         bool navigation_successful = false;
         bool negotiation;
         int count = 0;
-
-        ROS_INFO("****************** EXPLORE ******************");
 
         /*
          * Use mutex to lock the critical section 
@@ -244,17 +190,21 @@ class Explorer {
         exploration->transformToOwnCoordinates_frontiers();
         exploration->transformToOwnCoordinates_visited_frontiers();
 
-        //    			    ros::Duration(1.0).sleep();
         exploration->initialize_planner("exploration planner", costmap2d_local, costmap2d_global);
-        exploration->findFrontiers();
-        //                            exploration->printFrontiers();
 
+        exploration->findFrontiers();
+
+        // adds unvisited frontiers to a list, comparing them to a list of seen frontiers
         exploration->clearVisitedFrontiers();                       
+        // same, but with unreachable frontiers
         exploration->clearUnreachableFrontiers();
+        // dunno probably just checks the costmap for the frontiers
         exploration->clearSeenFrontiers(costmap2d_global);       
 
+        // this doesn't do anything, right?
         costmap_mutex.unlock();
 
+        // as in sends them out on multicast
         exploration->publish_frontier_list();  
         exploration->publish_visited_frontier_list();  
 
@@ -694,120 +644,6 @@ class Explorer {
       }
     }
 
-    /**
-     * save info on the map
-     */
-    void map_info()
-    {       
-      fs_csv.open(csv_file.c_str(), std::fstream::in | std::fstream::app | std::fstream::out);
-      fs_csv << "#time,exploration_travel_path_global,exploration_travel_path_average,global_map_progress,local_map_progress,number_of_completed_auctions, number_of_uncompleted_auctions, frontier_selection_strategy, costmap_size, unreachable_frontiers" << std::endl;
-      fs_csv.close();
-
-      while(ros::ok() && exploration_finished != true)
-      {
-        costmap_mutex.lock();
-
-        ros::Duration time = ros::Time::now() - time_start;
-        double exploration_time = time.toSec();  
-
-        map_progress.global_freespace = global_costmap_size();
-        map_progress.local_freespace = local_costmap_size();
-        map_progress.time = exploration_time;               
-        map_progress_during_exploration.push_back(map_progress);
-
-
-        double exploration_travel_path_global = (double)exploration->exploration_travel_path_global * 0.02;
-        double exploration_travel_path_average = 0;
-        if(counter != 0)
-        {
-          exploration_travel_path_average = (exploration->exploration_travel_path_global) / counter;
-        }
-
-        //                ROS_INFO("global map size: %f   at time: %f", map_progress.global_freespace, map_progress.time);
-        //                ROS_INFO("local map size : %f   at time: %f", map_progress.local_freespace, map_progress.time);
-        //                ROS_INFO("travel path glo: %d   at time: %f", exploration_travel_path_global, map_progress.time);
-        //                ROS_INFO("travel path ave: %d   at time: %f", exploration_travel_path_average, map_progress.time);
-
-        fs_csv.open(csv_file.c_str(), std::fstream::in | std::fstream::app | std::fstream::out);
-
-        fs_csv << map_progress.time << "," << exploration_travel_path_global << "," << exploration_travel_path_average << "," << map_progress.global_freespace << "," << map_progress.local_freespace << "," << global_iterattions <<  "," << exploration->number_of_completed_auctions << "," << exploration->number_of_uncompleted_auctions << "," << frontier_selection << "," <<  costmap_width << "," << exploration->unreachable_frontiers.size() <<  std::endl;
-        //                fs_csv << "travel_path_global   = " << exploration_travel_path_global << std::endl;
-        //                fs_csv << "travel_path_average  = " << exploration_travel_path_average << std::endl;             
-        //                fs_csv << "map_progress_global  = " << map_progress.global_freespace << std::endl;
-        //                fs_csv << "map_progress_average = " << map_progress.local_freespace << std::endl;
-        //                fs_csv << "time                 = " << map_progress.time << std::endl;
-        //                fs_csv << "                       " << std::endl;
-
-        fs_csv.close();
-
-        costmap_mutex.unlock();    
-
-        // call map_merger to log data
-        map_merger::LogMaps log;
-        log.request.log = 12;    /// request local and global map progress
-        ROS_DEBUG("Calling map_merger service logOutput");
-        if(!mm_log_client.call(log))
-          ROS_WARN("Could not call map_merger service to store log.");
-        ROS_DEBUG("Finished service call.");
-
-        save_progress();
-
-        ros::Duration(10.0).sleep();
-      }
-    }
-
-    /**
-     * size of the global costmap
-     */
-    int global_costmap_size()
-    {
-      occupancy_grid_global = costmap2d_global->getCostmap()->getCharMap();
-      int num_map_cells_ = costmap2d_global->getCostmap()->getSizeInCellsX() * costmap2d_global->getCostmap()->getSizeInCellsY();
-      int free = 0;
-
-      for (unsigned int i = 0; i < num_map_cells_; i++) 
-      {
-        if ((int) occupancy_grid_global[i] == costmap_2d::FREE_SPACE) 
-        {
-          free++;
-        }
-      }   
-      return free;
-    }
-
-    int local_costmap_size()
-    {   
-      if(OPERATE_ON_GLOBAL_MAP == false)
-      {
-        occupancy_grid_local = costmap2d_local->getCostmap()->getCharMap();
-        int num_map_cells_ = costmap2d_local->getCostmap()->getSizeInCellsX() * costmap2d_local->getCostmap()->getSizeInCellsY();
-        int free = 0;
-
-        for (unsigned int i = 0; i < num_map_cells_; i++) 
-        {
-          if ((int) occupancy_grid_local[i] == costmap_2d::FREE_SPACE) 
-          {
-            free++;
-          }
-        }   
-        return free;
-      }else
-      {
-        occupancy_grid_local = costmap2d_local_size->getCostmap()->getCharMap();
-        int num_map_cells_ = costmap2d_local_size->getCostmap()->getSizeInCellsX() * costmap2d_local_size->getCostmap()->getSizeInCellsY();
-        int free = 0;
-
-        for (unsigned int i = 0; i < num_map_cells_; i++) 
-        {
-          if ((int) occupancy_grid_local[i] == costmap_2d::FREE_SPACE) 
-          {
-            free++;
-          }
-        }   
-        return free;
-      }
-    }
-
     void initLogPath()
     {
       /*
@@ -1204,23 +1040,6 @@ class Explorer {
       pub_Point.publish < geometry_msgs::PointStamped > (goalPoint);
     }
 
-    void visualize_home_point() {
-
-      homePoint.header.seq = home_point_message++;
-      homePoint.header.stamp = ros::Time::now();
-      homePoint.header.frame_id = move_base_frame; //"map";
-      home_point_x = robotPose.getOrigin().getX();
-      home_point_y = robotPose.getOrigin().getY();
-      homePoint.point.x = home_point_x;
-      homePoint.point.y = home_point_y;
-
-      ros::NodeHandle nh("homePoint");
-      pub_home_Point = nh.advertise < geometry_msgs::PointStamped
-        > ("homePoint", 100, true);
-      pub_home_Point.publish < geometry_msgs::PointStamped > (homePoint);
-
-    }
-
     // what actually moves the robot through the action client
     // returns true if the action succeeded, false on abort, 
     bool move_robot(int seq, double position_x, double position_y) {
@@ -1433,7 +1252,6 @@ class Explorer {
     move_base_msgs::MoveBaseActionGoal action_goal_msg;
     move_base_msgs::MoveBaseActionFeedback feedback_msgs;
 
-    //move_base::MoveBase simple_move_base;
     geometry_msgs::PointStamped goalPoint;
     geometry_msgs::PointStamped homePoint;
 
@@ -1450,11 +1268,7 @@ class Explorer {
 };
 
 int main(int argc, char **argv) {
-  /*
-   * ROS::init() function needs argc and argv to perform
-   * any argument and remapping that is provided by the
-   * command line. The third argument is the name of the node
-   */
+
   ros::init(argc, argv, "simple_navigation");
   /*
    * Create instance of Simple Navigation
@@ -1462,19 +1276,7 @@ int main(int argc, char **argv) {
   tf::TransformListener tf(ros::Duration(10));
   Explorer simple(tf);
 
-  /*
-   * The ros::spin command is needed to wait for any call-back. This could for
-   * example be a subscription on another topic. Do this to be able to receive a
-   * message.
-   */
-
   boost::thread thr_explore(boost::bind(&Explorer::explore, &simple));	
-  //        boost::thread thr_frontiers(boost::bind(&SimpleNavigation::frontiers, &simple));
-  /*
-   * The following thread is only necessary to log simulation results.
-   * Otherwise it produces unused output.
-   */
-  boost::thread thr_map(boost::bind(&Explorer::map_info, &simple));
 
   /*
    * FIXME
@@ -1488,17 +1290,12 @@ int main(int argc, char **argv) {
     ros::spinOnce();
     costmap_mutex.unlock();
 
-    //            r.sleep();
     ros::Duration(0.1).sleep();
   }
 
   thr_explore.interrupt();
-  thr_map.interrupt();
-  //	thr_frontiers.interrupt();
 
   thr_explore.join();
-  thr_map.join();
-  //        thr_frontiers.interrupt();
 
   return 0;
 }

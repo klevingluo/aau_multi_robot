@@ -26,7 +26,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "math.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
-
+#include <opencv2/features2d/features2d.hpp>
 
 StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, float max_pairwise_distance, cv::Mat oldTransform) {
 
@@ -41,16 +41,15 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
 
   // create feature detector set.
   Ptr<ORB> detector = ORB::create();
-  DescriptorExtractor dexc;
-  BFMatcher dematc(NORM_HAMMING, false);
+  Ptr<cv::DescriptorMatcher> dematc = cv::DescriptorMatcher::create("BruteForce-Hamming");
 
   // 1. extract keypoints
   detector->detect(image1, kpv1);
   detector->detect(image2, kpv2);
 
   // 2. extract descriptors
-  dexc.compute(image1, kpv1, dscv1);
-  dexc.compute(image2, kpv2, dscv2);
+  detector->compute(image1, kpv1, dscv1);
+  detector->compute(image2, kpv2, dscv2);
 
   // 3. match keypoints
   // seems to need 450 kpv for a good match - kevin
@@ -60,7 +59,7 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
       return;
   }
 
-  dematc.match(dscv1, dscv2, matches);
+  dematc->match(dscv1, dscv2, matches);
   ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries\t matches: %i",
       static_cast<int>(kpv1.size()),
       static_cast<int>(kpv2.size()), 
@@ -85,7 +84,6 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
       if ( fabs(norm(a1.pt-a2.pt) - norm(b1.pt-b2.pt)) > max_pairwise_distance ||
            fabs(norm(a1.pt-a2.pt) - norm(b1.pt-b2.pt)) == 0)
         continue;
-
 
       // points used for matching
       coord1.push_back(a1.pt);

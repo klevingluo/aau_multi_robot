@@ -107,7 +107,6 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   std::string robo_name = prefix.append(robot_number.str());   
 
   if(robot_prefix_empty_param == true) {
-    /*NO SIMULATION*/
     robo_name = "";
     robot_str = robot_name_parameter;
   }
@@ -159,33 +158,6 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   srand((unsigned)time(0));
 }
 
-void ExplorationPlanner::Callbacks() {
-  ros::Rate r(10);
-  while(ros::ok())
-  {
-
-    //        publish_subscribe_mutex.lock();
-
-    if(robot_name == 1)
-    {
-      sub_frontiers = nh_frontier.subscribe("/robot_0/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-      sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_0/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-      sub_negotioation = nh_negotiation.subscribe("/robot_0/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
-      sub_auctioning = nh_auction.subscribe("/robot_1/auction", 1000, &ExplorationPlanner::auctionCallback, this);
-
-    }
-    else if(robot_name == 0) {
-      sub_frontiers = nh_frontier.subscribe("/robot_1/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-      sub_visited_frontiers = nh_visited_frontier.subscribe("/robot_1/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-      sub_negotioation = nh_negotiation.subscribe("/robot_1/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this);
-      sub_auctioning = nh_auction.subscribe("/robot_0/auction", 1000, &ExplorationPlanner::auctionCallback, this);
-
-    }
-
-    r.sleep();
-  }
-}
-
 void ExplorationPlanner::initialize_planner(std::string name,
     costmap_2d::Costmap2DROS *costmap, costmap_2d::Costmap2DROS *costmap_global) {
 
@@ -217,12 +189,6 @@ void ExplorationPlanner::initialize_planner(std::string name,
  * write frontiers from list to clusters
  */
 bool ExplorationPlanner::clusterFrontiers() {
-  int strategy = 1;
-  /*
-   * Strategy:
-   * 1 ... merge clusters close together
-   * 2 ... merge clusters based on model
-   */
 
   bool cluster_found_flag = false, same_id = false;
 
@@ -315,218 +281,61 @@ bool ExplorationPlanner::clusterFrontiers() {
    */
   bool run_without_merging = false; 
 
-  if(strategy == 1)
+  while(run_without_merging == false)
   {
-    while(run_without_merging == false)
+    bool merge_clusters = false; 
+    for(int i = 0; i < clusters.size(); i++)
     {
-      bool merge_clusters = false; 
-      for(int i = 0; i < clusters.size(); i++)
-      {
-        for(int m = 0; m < clusters.at(i).cluster_element.size(); m ++)
-        {   
-          if(clusters.at(i).cluster_element.size() > 1)
+      for(int m = 0; m < clusters.at(i).cluster_element.size(); m ++)
+      {   
+        if(clusters.at(i).cluster_element.size() > 1)
+        {
+          for(int j = 0; j < clusters.size(); j++)
           {
-            for(int j = 0; j < clusters.size(); j++)
+            if(clusters.at(i).id != clusters.at(j).id)
             {
-              if(clusters.at(i).id != clusters.at(j).id)
-              {
-                if(clusters.at(j).cluster_element.size() > 1)
-                {                            
+              if(clusters.at(j).cluster_element.size() > 1)
+              {                            
+                for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
+                { 
+                  if(fabs(clusters.at(i).cluster_element.at(m).x_coordinate - clusters.at(j).cluster_element.at(n).x_coordinate) < CLUSTER_MERGING_DIST && fabs(clusters.at(i).cluster_element.at(m).y_coordinate - clusters.at(j).cluster_element.at(n).y_coordinate) < CLUSTER_MERGING_DIST)
+                  {                   
+                    merge_clusters = true; 
+                    break;                                   
+                  }
+                }
+                if(merge_clusters == true)
+                {
+                  /*
+                   * Now merge cluster i with cluster j.
+                   * afterwards delete cluster j.
+                   */
                   for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
-                  { 
-                    if(fabs(clusters.at(i).cluster_element.at(m).x_coordinate - clusters.at(j).cluster_element.at(n).x_coordinate) < CLUSTER_MERGING_DIST && fabs(clusters.at(i).cluster_element.at(m).y_coordinate - clusters.at(j).cluster_element.at(n).y_coordinate) < CLUSTER_MERGING_DIST)
-                    {                   
-                      //                                        ROS_INFO("Merge cluster %d", clusters.at(j).id);
-                      merge_clusters = true; 
-                      break;                                   
-                    }
-                  }
-                  if(merge_clusters == true)
                   {
-                    /*
-                     * Now merge cluster i with cluster j.
-                     * afterwards delete cluster j.
-                     */
-                    for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
-                    {
-                      frontier_t frontier_to_merge;
-                      frontier_to_merge = clusters.at(j).cluster_element.at(n);
-                      clusters.at(i).cluster_element.push_back(frontier_to_merge);
-                    }
-                    //                                    ROS_INFO("Erasing cluster %d", clusters.at(j).id);
-                    clusters.erase(clusters.begin() + j);
-                    break;
+                    frontier_t frontier_to_merge;
+                    frontier_to_merge = clusters.at(j).cluster_element.at(n);
+                    clusters.at(i).cluster_element.push_back(frontier_to_merge);
                   }
+                  //                                    ROS_INFO("Erasing cluster %d", clusters.at(j).id);
+                  clusters.erase(clusters.begin() + j);
+                  break;
                 }
               }
             }
           }
-          if(merge_clusters == true)
-            break;
         }
         if(merge_clusters == true)
           break;
       }
-      if(merge_clusters == false)
-      {
-        run_without_merging = true;
-      }  
-      //        ROS_INFO("RUN WITHOUT MERGING: %d", run_without_merging);
-    } 
-  }
-  else if(strategy == 2)
-  {
-    int MAX_NEIGHBOURS = 4;
-    double costmap_resolution = costmap_ros_->getCostmap()->getResolution();
-
-    while(run_without_merging == false)
+      if(merge_clusters == true)
+        break;
+    }
+    if(merge_clusters == false)
     {
-      bool merge_clusters = false; 
-      for(int i = 0; i < clusters.size(); i++)
-      {
-        for(int m = 0; m < clusters.at(i).cluster_element.size(); m ++)
-        {   
-          if(clusters.at(i).cluster_element.size() > 1)
-          {
-            for(int j = 0; j < clusters.size(); j++)
-            {
-              if(clusters.at(i).id != clusters.at(j).id)
-              {
-                if(clusters.at(j).cluster_element.size() > 1)
-                {                            
-                  for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
-                  { 
-                    unsigned char cost;
-                    unsigned int mx,my;
-                    int freespace_detected = 0;
-                    int obstacle_detected  = 0;
-                    int elements_detected = 0; 
-
-                    ROS_INFO("Calculating ...");
-                    int x_length = abs(clusters.at(i).cluster_element.at(m).x_coordinate - clusters.at(j).cluster_element.at(n).x_coordinate);
-                    int y_length = abs(clusters.at(i).cluster_element.at(m).y_coordinate - clusters.at(j).cluster_element.at(n).y_coordinate);
-
-                    ROS_INFO("x_length: %d    y_length: %d   resolution: %f", x_length, y_length,costmap_resolution);
-                    int x_elements = abs(x_length / costmap_resolution);
-                    int y_elements = abs(y_length / costmap_resolution);
-
-                    ROS_INFO("alpha");
-                    double alpha; 
-                    if(x_length == 0)
-                    {
-                      alpha = 0;
-                    }
-                    else
-                    {
-                      alpha = atan(y_length/x_length);
-                    }
-
-                    ROS_INFO("atan: %f   x_length: %d    y_length: %d", alpha, x_length, y_length);
-
-                    for(int x = 0; x <= x_elements; x++)
-                    {      
-                      /* increase neighbor size*/
-                      for(int neighbour = 0; neighbour < MAX_NEIGHBOURS; neighbour++)
-                      {
-                        int y = tan(alpha) * x * costmap_ros_->getCostmap()->getResolution();
-                        ROS_INFO("x: %d    y: %d", x, y);
-                        if(!costmap_global_ros_->getCostmap()->worldToMap(clusters.at(i).cluster_element.at(m).x_coordinate + x, clusters.at(i).cluster_element.at(m).y_coordinate + y + neighbour,mx,my))
-                        {
-                          ROS_ERROR("Cannot convert coordinates successfully.");
-                          continue;
-                        }
-                        cost = costmap_global_ros_->getCostmap()->getCost(mx, my);  
-
-                        if(cost == costmap_2d::FREE_SPACE)
-                        {
-                          freespace_detected = true;
-                        }
-                        else if(cost == costmap_2d::LETHAL_OBSTACLE)
-                        {
-                          obstacle_detected = true;
-                        }
-                        elements_detected++;
-                      }  
-
-                      /* decrease neighbor size*/
-                      for(int neighbour = 0; neighbour < MAX_NEIGHBOURS; neighbour++)
-                      {
-                        int y = tan(alpha) * x * costmap_ros_->getCostmap()->getResolution();
-                        ROS_INFO("x: %d    y: %d", x, y);
-                        if(!costmap_global_ros_->getCostmap()->worldToMap(clusters.at(i).cluster_element.at(m).x_coordinate + x, clusters.at(i).cluster_element.at(m).y_coordinate + y - neighbour,mx,my))
-                        {
-                          ROS_ERROR("Cannot convert coordinates successfully.");
-                          continue;
-                        }
-                        cost = costmap_global_ros_->getCostmap()->getCost(mx, my);  
-
-                        if(cost == costmap_2d::FREE_SPACE)
-                        {
-                          freespace_detected = true;
-                        }
-                        else if(cost == costmap_2d::LETHAL_OBSTACLE)
-                        {
-                          obstacle_detected = true;
-                        }
-                        elements_detected++;
-                      }  
-                    }
-
-
-                    ROS_INFO("*******************************");
-                    ROS_INFO("elements: %d    obstacle: %d", elements_detected, obstacle_detected);
-                    ROS_INFO("*******************************");
-                    if(elements_detected * 0.25 < obstacle_detected)
-                    {
-                      ROS_INFO("Merging clusters");
-                      merge_clusters = true; 
-                      break; 
-                    }
-                    break;
-                    //                                        if(fabs(clusters.at(i).cluster_element.at(m).x_coordinate - clusters.at(j).cluster_element.at(n).x_coordinate) < CLUSTER_MERGING_DIST && fabs(clusters.at(i).cluster_element.at(m).y_coordinate - clusters.at(j).cluster_element.at(n).y_coordinate) < CLUSTER_MERGING_DIST)
-                    //                                        {                   
-                    //    //                                        ROS_INFO("Merge cluster %d", clusters.at(j).id);
-                    //                                            merge_clusters = true; 
-                    //                                            break;                                   
-                    //                                        }
-                  }
-                  if(merge_clusters == true)
-                  {
-                    ROS_INFO("Merging");
-                    /*
-                     * Now merge cluster i with cluster j.
-                     * afterwards delete cluster j.
-                     */
-                    for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
-                    {
-                      frontier_t frontier_to_merge;
-                      frontier_to_merge = clusters.at(j).cluster_element.at(n);
-                      clusters.at(i).cluster_element.push_back(frontier_to_merge);
-                    }
-                    //                                    ROS_INFO("Erasing cluster %d", clusters.at(j).id);
-                    clusters.erase(clusters.begin() + j);
-                    j--;
-                    ROS_INFO("Done merging");
-                    break;
-                  }
-                }
-              }
-              break;
-            }
-          }
-          if(merge_clusters == true)
-            break;
-        }
-        if(merge_clusters == true)
-          break;
-      }
-      if(merge_clusters == false)
-      {
-        run_without_merging = true;
-      }  
-      //        ROS_INFO("RUN WITHOUT MERGING: %d", run_without_merging);
-    } 
-  }   
+      run_without_merging = true;
+    }  
+    //        ROS_INFO("RUN WITHOUT MERGING: %d", run_without_merging);
+  } 
 }
 
 /**
@@ -534,7 +343,6 @@ bool ExplorationPlanner::clusterFrontiers() {
  */
 void ExplorationPlanner::visualizeClustersConsole() {
   visualization_msgs::MarkerArray clustersArray;
-
   for(int j = 0; j < clusters.size(); j++) {
 
     double color_r = (double)rand() / RAND_MAX;
@@ -677,7 +485,6 @@ bool ExplorationPlanner::transformToOwnCoordinates_frontiers() {
   ROS_INFO(" Transform frontier coordinates DONE");
 }
 
-
 bool ExplorationPlanner::transformToOwnCoordinates_visited_frontiers() {
   ROS_INFO("Transform Visited Frontier Coordinates");
 
@@ -793,7 +600,6 @@ bool ExplorationPlanner::check_trajectory_plan() {
     if(frontiers.size() > i) {   
       std::vector<double> backoffGoal;
       bool backoff_flag = smartGoalBackoff(frontiers.at(i).x_coordinate,frontiers.at(i).y_coordinate, costmap_global_ros_, &backoffGoal);
-
 
       goalPointSimulated.header.seq = goal_point_simulated_message++;	// increase the sequence number
       goalPointSimulated.header.stamp = ros::Time::now();
@@ -1038,12 +844,14 @@ void ExplorationPlanner::printFrontiers() {
   }
 }
 
+/**
+ * adds a frontier to the frontiers list
+ */
 bool ExplorationPlanner::storeFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id) {
   frontier_t new_frontier;
 
   if(robot_prefix_empty_param == true)
   {        
-    ROS_DEBUG("Storing Frontier ID: %d   Robot: %s", id, detected_by_robot_str.c_str());
     if(id != -1)
     {
       new_frontier.id = id;
@@ -1051,13 +859,6 @@ bool ExplorationPlanner::storeFrontier(double x, double y, int detected_by_robot
     {
       new_frontier.id = frontier_id_count++;
     }
-    new_frontier.detected_by_robot_str = detected_by_robot_str;
-    new_frontier.x_coordinate = x;
-    new_frontier.y_coordinate = y;
-
-    store_frontier_mutex.lock(); 
-    frontiers.push_back(new_frontier);
-    store_frontier_mutex.unlock();
   }else
   {
     if(detected_by_robot != robot_name)
@@ -1069,14 +870,14 @@ bool ExplorationPlanner::storeFrontier(double x, double y, int detected_by_robot
       new_frontier.id = (robot_name * 10000) + frontier_id_count++; 
     }
 
-    new_frontier.detected_by_robot = detected_by_robot;
-    new_frontier.x_coordinate = x;
-    new_frontier.y_coordinate = y;
-
-    store_frontier_mutex.lock(); 
-    frontiers.push_back(new_frontier);
-    store_frontier_mutex.unlock();
   }
+  new_frontier.detected_by_robot = detected_by_robot;
+  new_frontier.x_coordinate = x;
+  new_frontier.y_coordinate = y;
+
+  store_frontier_mutex.lock(); 
+  frontiers.push_back(new_frontier);
+  store_frontier_mutex.unlock();
 
   return true;
 }
@@ -1551,16 +1352,6 @@ bool ExplorationPlanner::respondToAuction(std::vector<requested_cluster_t> reque
     }
     cluster_mutex.unlock();
   }
-
-  /*
-   * Visualize the auction message to send
-   */
-  //            for(int i = 0; i < auction_msgs.available_clusters.size(); i++)
-  //            {
-  //                adhoc_communication::Cluster cluster_msg_check;
-  //                cluster_msg_check = auction_msgs.available_clusters.at(i);
-  //                ROS_INFO("Robot %d sending BID: %f cluster elements: %lu", robot_name, cluster_msg_check.bid, cluster_msg_check.ids_contained.size());
-  //            }
 
   ROS_INFO("Robot %d publishes auction bids for all clusters", robot_name);
 
@@ -2241,8 +2032,6 @@ void ExplorationPlanner::visited_frontierCallback(const adhoc_communication::Exp
 
 bool ExplorationPlanner::publish_frontier_list()
 {
-  //    ROS_INFO("PUBLISHING FRONTIER LIST");
-
   publish_subscribe_mutex.lock();
 
   adhoc_communication::ExpFrontier frontier_msg;
@@ -2261,7 +2050,6 @@ bool ExplorationPlanner::publish_frontier_list()
     frontier_msg.frontier_element.push_back(frontier_element);
   }
 
-  //    pub_frontiers.publish(frontier_msg);
   sendToMulticast("mc_",frontier_msg, "frontiers");
 
   publish_subscribe_mutex.unlock();
@@ -2460,8 +2248,6 @@ void ExplorationPlanner::clearVisitedAndSeenFrontiersFromClusters()
 
 void ExplorationPlanner::clearVisitedFrontiers()
 {
-  //    ROS_INFO("Clear Visited");
-
   /* visited_frontier.at(0) is the Home point. Do not compare
    * with this point. Otherwise this algorithm deletes it, a new
    * frontier close to the home point is found which is then again
@@ -2494,17 +2280,11 @@ void ExplorationPlanner::clearVisitedFrontiers()
           {
             j--;
           }
-          //                    goals_to_clear.push_back(frontiers.at(j).id);
         }
         break;
       }
     }
   }
-
-  //    for(int i= 0; i< goals_to_clear.size(); i++)
-  //    {
-  //        removeStoredFrontier(goals_to_clear.at(i), goals_to_clear.); 
-  //    }   
 }
 
 void ExplorationPlanner::clearUnreachableFrontiers()
@@ -2544,113 +2324,86 @@ void ExplorationPlanner::clearUnreachableFrontiers()
           {
             j--;
           }
-          //                    goals_to_clear.push_back(frontiers.at(j).id);
         }
         break;
       }
     }
   }
-
-  //    for(int i= 0; i< goals_to_clear.size(); i++)
-  //    {
-  //        removeStoredFrontier(goals_to_clear.at(i)); 
-  //    }    
 }
 
 void ExplorationPlanner::clearSeenFrontiers(costmap_2d::Costmap2DROS *global_costmap)
 {
-  //    ROS_INFO("Clear Seen");
   unsigned int mx, my, point;
   std::vector<int> neighbours, goals_to_clear;
 
-  //    this->costmap_global_ros_ = global_costmap;
-  //    costmap_global_ros_->getCostmapCopy(costmap_global_);
-  //    costmap_global_ros_->getCostmap();
-
-  //    ROS_INFO("Map origin  x: %f    y: %f", global_costmap->getCostmap()->getOriginX(), global_costmap->getCostmap()->getOriginY());
-  //    ROS_INFO("Map size    x: %d    y: %d", global_costmap->getCostmap()->getSizeInCellsX(), global_costmap->getCostmap()->getSizeInCellsY());
-  if(frontiers.size() > 1)
+  for(int i = 0; i < frontiers.size(); i++)
   {
-    for(int i = 0; i < frontiers.size(); i++)
+    unsigned int new_mx, new_my;
+    bool unknown_found = false; 
+    bool obstacle_found = false;
+    bool freespace_found = false;
+
+    mx = 0; 
+    my = 0;
+
+    // ROS_INFO("frontier x: %f   y: %f", frontiers.at(i).x_coordinate,frontiers.at(i).y_coordinate);
+    if(!global_costmap->getCostmap()->worldToMap(frontiers.at(i).x_coordinate,frontiers.at(i).y_coordinate,mx,my))
     {
-      unsigned int new_mx, new_my;
-      bool unknown_found = false; 
-      bool obstacle_found = false;
-      bool freespace_found = false;
-
-      mx = 0; 
-      my = 0;
-
-      // ROS_INFO("frontier x: %f   y: %f", frontiers.at(i).x_coordinate,frontiers.at(i).y_coordinate);
-      if(!global_costmap->getCostmap()->worldToMap(frontiers.at(i).x_coordinate,frontiers.at(i).y_coordinate,mx,my))
-      {
-        ROS_ERROR("Cannot convert coordinates successfully.");
-        continue;
-      }
-      //            ROS_INFO("Map coordinates mx: %d  my: %d",mx,my);
-
-      neighbours = getMapNeighbours(mx, my, 6);
-
-      //            ROS_INFO("Neighbours: %lu", neighbours.size());
-      for (int j = 0; j < neighbours.size()/2; j++)
-      {
-
-
-        //                ROS_INFO("Get Neighbour %d and %d",j*2, j*2+1);
-        new_mx = neighbours.at(j*2);
-        new_my = neighbours.at(j*2+1);
-        //                ROS_INFO("got access");
-
-
-        //                ROS_INFO("Calculating at position x: %d    y: %d", new_mx, new_my);     
-        unsigned char cost = global_costmap->getCostmap()->getCost(new_mx, new_my);
-        //                ROS_INFO("x position: %d       y position: %d", new_mx, new_my);
-        //                ROS_INFO("Got Cost");
-        if(cost == costmap_2d::NO_INFORMATION)
-        {
-          unknown_found = true;
-        }
-        else if(cost == costmap_2d::FREE_SPACE)
-        {
-          freespace_found = true;
-        }
-        else if(cost == costmap_2d::LETHAL_OBSTACLE)
-        {
-          obstacle_found = true;
-        }
-        //                ROS_INFO("Done");
-      } 
-
-      if(unknown_found == false || obstacle_found == true || freespace_found == false)
-      {
-
-        //                goals_to_clear.push_back(frontiers.at(i).id);
-        if(robot_prefix_empty_param == true)
-        {
-          removeStoredFrontier(frontiers.at(i).id, frontiers.at(i).detected_by_robot_str);
-          if(i > 0)
-          {
-            i--;
-          }
-        }else
-        {
-          removeStoredFrontier(frontiers.at(i).id, "");
-          if(i > 0)
-          {
-            i--;
-          }
-        }
-        seen_frontier_list.push_back(frontiers.at(i));
-
-      }
+      ROS_ERROR("Cannot convert coordinates successfully.");
+      continue;
     }
+    //            ROS_INFO("Map coordinates mx: %d  my: %d",mx,my);
 
-    //        ROS_INFO("Clearing %lu frontiers", goals_to_clear.size());
-    //        for(int i= 0; i< goals_to_clear.size(); i++)
-    //        {
-    //    //        ROS_DEBUG("Frontier with ID: %d already seen and therefore deleted", goals_to_clear.at(i));
-    //            removeStoredFrontier(goals_to_clear.at(i)); 
-    //        }
+    neighbours = getMapNeighbours(mx, my, 6);
+
+    //            ROS_INFO("Neighbours: %lu", neighbours.size());
+    for (int j = 0; j < neighbours.size()/2; j++)
+    {
+
+
+      //                ROS_INFO("Get Neighbour %d and %d",j*2, j*2+1);
+      new_mx = neighbours.at(j*2);
+      new_my = neighbours.at(j*2+1);
+      //                ROS_INFO("got access");
+
+
+      //                ROS_INFO("Calculating at position x: %d    y: %d", new_mx, new_my);     
+      unsigned char cost = global_costmap->getCostmap()->getCost(new_mx, new_my);
+      //                ROS_INFO("x position: %d       y position: %d", new_mx, new_my);
+      //                ROS_INFO("Got Cost");
+      if(cost == costmap_2d::NO_INFORMATION)
+      {
+        unknown_found = true;
+      }
+      else if(cost == costmap_2d::FREE_SPACE)
+      {
+        freespace_found = true;
+      }
+      else if(cost == costmap_2d::LETHAL_OBSTACLE)
+      {
+        obstacle_found = true;
+      }
+    } 
+
+    if(unknown_found == false || obstacle_found == true || freespace_found == false)
+    {
+      if(robot_prefix_empty_param == true)
+      {
+        removeStoredFrontier(frontiers.at(i).id, frontiers.at(i).detected_by_robot_str);
+        if(i > 0)
+        {
+          i--;
+        }
+      }else
+      {
+        removeStoredFrontier(frontiers.at(i).id, "");
+        if(i > 0)
+        {
+          i--;
+        }
+      }
+      seen_frontier_list.push_back(frontiers.at(i));
+    }
   }
 }
 
@@ -2660,18 +2413,12 @@ bool ExplorationPlanner::smartGoalBackoff(double x, double y, costmap_2d::Costma
   double wx, wy;
   std::vector<int> neighbours, inner_neighbours;
 
-  //    this->costmap_global_ros_ = global_costmap;
-  //    costmap_global_ros_->getCostmapCopy(costmap_global_);
-  //    costmap_global_ = costmap_global_ros_;
-
   if(!global_costmap->getCostmap()->worldToMap(x,y,mx,my))
   {
     ROS_ERROR("Cannot convert coordinates successfully.");
   }
-  //    ROS_DEBUG("Map coordinates mx: %d  my: %d",mx,my);
 
   neighbours = getMapNeighbours(mx, my, 40);
-  //    ROS_DEBUG("Got neighbours");
   for (int j = 0; j< neighbours.size()/2; j++)
   {
     //        ROS_DEBUG("Get neighbours %d and %d",j*2,j*2+1);
@@ -2738,67 +2485,36 @@ std::vector<int> ExplorationPlanner::getMapNeighbours(unsigned int point_x, unsi
  * The returned frontiers are in world coordinates.
  */
 void ExplorationPlanner::findFrontiers() {
+// TODO:  fix this, it's a little inefficient, 2 hrs
 
-  ROS_INFO("Find Frontiers");
+  ROS_INFO("called find frontiers");
+
   allFrontiers.clear();
   int select_frontier = 1;
   std::vector<double> final_goal,start_points;
-  // list of all frontiers in the occupancy grid
 
-  //	// get latest costmap
-  //	clearFrontiers();
-
-  /*
-   * check for all cells in the occupancy grid whether
-   * or not they are frontier cells. If a possible frontier is found, true is
-   * returned
-   */
   int new_frontier_point = 0;
   for (unsigned int i = 0; i < num_map_cells_; i++) {
 
     int new_frontier_point = isFrontier(i);
     if (new_frontier_point != 0) {
-      /*
-       * If isFrontier() returns true, the point which is checked to be a frontier
-       * is indeed a frontier.
-       *
-       * Push back adds data x to a vector.
-       * If a frontier was found, the position of the frontier is stored
-       * in the allFrontiers vector.
-       */
       allFrontiers.push_back(new_frontier_point);
     }
   }
   ROS_INFO("Found %lu frontier cells which are transformed into frontiers points. Starting transformation...", allFrontiers.size());
 
-  /*
-   * Iterate over all frontiers. The frontiers stored in allFrontiers are
-   * already REAL frontiers and can be approached by the robot to get new
-   * informations of the environment.
-   * To limit the amount of frontiers and only pick those which are valuable to
-   * drive there, check neighboring frontiers and only remember them if they are
-   * further then a distance of 40cm away from each other, discard otherwise.
-   * The rest of the frontiers are stored in a goal buffer which contain all
-   * frontiers within the map. Additionally check whether or not a newly found
-   * frontier has already been added to the list. If it is already in the list, do
-   * not make a new entry with the coordinates of the frontier!
-   */
   for (unsigned int i = 0; i < allFrontiers.size(); ++i) {
 
     geometry_msgs::PoseStamped finalFrontier;
-    double wx, wy, wx2, wy2, wx3, wy3;
-    unsigned int mx, my, mx2, my2, mx3, my3;
+    double wx, wy;
+    unsigned int mx, my;
     bool result;
-
 
     costmap_ros_->getCostmap()->indexToCells(allFrontiers.at(i), mx, my);
     costmap_ros_->getCostmap()->mapToWorld(mx, my, wx, wy);
 
-    //                ROS_INFO("index: %d   map_x: %d   map_y: %d   world_x: %f   world_y: %f", allFrontiers.at(i), mx, my, wx, wy);
-
-    if(select_frontier == 1)
-    {
       result = true;
+      // checks to make sure frontiers are far enough apart to store
       for (unsigned int j = 0; j < frontiers.size(); j++)
       {
         if (fabs(wx - frontiers.at(j).x_coordinate) <= MAX_GOAL_RANGE && fabs(wy - frontiers.at(j).y_coordinate) <= MAX_GOAL_RANGE) 
@@ -2811,57 +2527,6 @@ void ExplorationPlanner::findFrontiers() {
       {
         storeFrontier(wx,wy,robot_name,robot_str,-1);
       }
-    }
-    else if(select_frontier == 2)
-    {
-      std::vector<int> neighbour_index;
-
-      for (unsigned int j = 0; j < allFrontiers.size(); ++j)
-      {
-        costmap_ros_->getCostmap()->indexToCells(allFrontiers[j], mx2, my2);
-        costmap_ros_->getCostmap()->mapToWorld(mx2, my2, wx2, wy2);
-
-        if (fabs(wx - wx2) <= MINIMAL_FRONTIER_RANGE && fabs(wy - wy2) <= MINIMAL_FRONTIER_RANGE && fabs(wx - wx2) != 0 && fabs(wy - wy2) != 0)
-        {
-          neighbour_index.push_back(allFrontiers[j]);
-        }
-      }
-
-
-      for (unsigned int n = 0; n < neighbour_index.size(); ++n)
-      {
-        costmap_ros_->getCostmap()->indexToCells(neighbour_index[n], mx2, my2);
-        costmap_ros_->getCostmap()->mapToWorld(mx2, my2, wx2, wy2);
-
-        while(true)
-        {
-          bool end_point_found = true;
-          for (unsigned int k = 0; k < allFrontiers.size(); ++k)
-          {
-            costmap_ros_->getCostmap()->indexToCells(allFrontiers[k], mx3, my3);
-            costmap_ros_->getCostmap()->mapToWorld(mx3, my3, wx3, wy3);
-
-            if (fabs(wx2 - wx3) <= MINIMAL_FRONTIER_RANGE && fabs(wy2 - wy3) <= MINIMAL_FRONTIER_RANGE && wx2 != wx3 && wy2 != wy3 && wx != wx3 && wy != wy3)
-            {
-              wx  = wx2;
-              wy  = wy2;
-              wx2 = wx3;
-              wy2 = wy3;
-              end_point_found = false;
-            }
-          }
-          if(end_point_found == true)
-          {
-            start_points.push_back(wx2);
-            start_points.push_back(wy2);
-
-            break;
-          }
-        }
-      }
-      goal_buffer_x.push_back(start_points.at(0)+(start_points.at(2)-start_points.at(0))/2);
-      goal_buffer_y.push_back(start_points.at(1)+(start_points.at(3)-start_points.at(1))/2);
-    }
   }
 
   ROS_INFO("Size of all frontiers in the list: %lu", frontiers.size());
@@ -2883,7 +2548,7 @@ bool ExplorationPlanner::auctioning(std::vector<double> *final_goal, std::vector
 
   float r = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
   float wait_if_auction_runs = r * 2;
-  //    wait_if_auction_runs = wait_if_auction_runs - robot_name; // FIXME
+
   if(wait_if_auction_runs < 0)
     wait_if_auction_runs = wait_if_auction_runs * (-1);
 
@@ -2900,25 +2565,6 @@ bool ExplorationPlanner::auctioning(std::vector<double> *final_goal, std::vector
       wait_if_auction_runs = wait_if_auction_runs * (-1);
 
   }
-
-  //EDIT Peter : Removed this wait part to speed up the process!
-
-  /*
-     if(robot_name != 0)
-     auction_finished = false;
-  //why here sleep so long ?
-  while(auction_finished == false && timer_count <= 20)
-  {
-  timer_count++;
-  ros::Duration(1).sleep();
-  }*/
-
-  /*
-   * If no auction is running ... clear the auction vector and
-   * start a new auction.
-   */
-  //how do i know that no auction is running ??
-  //EDIT Peter: New bool to check if auction is running!
 
   if(auction_running)
   {
@@ -2954,23 +2600,6 @@ bool ExplorationPlanner::auctioning(std::vector<double> *final_goal, std::vector
     auction_msg.robot_name = robot_str;
     robo_name = robot_str;
   }
-  /*
-   * visualize all cluster elements
-   */
-
-  //    for(int i = 0; i < clusters.size(); i++)
-  //    {
-  //        ROS_INFO("---- Cluster %d ----", clusters.at(i).id);
-  //        std::string requested_clusters;
-  //        for(int j = 0; j < clusters.at(i).cluster_element.size(); j++)
-  //        { 
-  //            requested_clusters.append(NumberToString((int)clusters.at(i).cluster_element.at(j).id));
-  //            requested_clusters.append(", ");
-  //        }
-  //        ROS_INFO("Cluster ids: %s", requested_clusters.c_str());
-  //    }
-
-
 
   for(int i = 0; i < clusters.size(); i++)
   {
@@ -5185,22 +4814,20 @@ bool ExplorationPlanner::isSameFrontier(int frontier_point1,
   return false;
 }
 
-// Used to generate direction for frontiers
+/**
+ * Used to generate direction for frontiers
+ */
 double ExplorationPlanner::getYawToUnknown(int point) {
   int adjacentPoints[8];
   getAdjacentPoints(point, adjacentPoints);
 
   int max_obs_idx = 0;
 
-  for (int i = 0; i < 8; ++i) {
-    if (isValid(adjacentPoints[i])) {
-      if (occupancy_grid_array_[adjacentPoints[i]]
-          == costmap_2d::NO_INFORMATION) {
-        if (obstacle_trans_array_[adjacentPoints[i]]
-            > obstacle_trans_array_[adjacentPoints[max_obs_idx]]) {
-          max_obs_idx = i;
-        }
-      }
+  for (size_t i = 0; i < 8; i++) {
+    if (adjacentPoints[i] > 0 &&
+        occupancy_grid_array_[adjacentPoints[i]] == costmap_2d::NO_INFORMATION &&
+        obstacle_trans_array_[adjacentPoints[i]] > obstacle_trans_array_[adjacentPoints[max_obs_idx]]) {
+      max_obs_idx = i;
     }
   }
 
@@ -5216,150 +4843,35 @@ double ExplorationPlanner::getYawToUnknown(int point) {
 
 }
 
+/**
+ * returns the point if it is a frontier, 0 otherwise
+ */
 int ExplorationPlanner::isFrontier(int point) {
-
-
-  if (isFree(point)) {
-
-    /*
-     * The point is a either a obstacle or a point with not enough
-     * information about
-     * Therefore, check if the point is surrounded by other NO_INFORMATION
-     * points. Then further space to explore is found ---> frontier
-     */
-    //int Neighbours = 0;
-    //int points[((int)pow(8,Neighbours+1))+8]; // NEIGHBOURS points, each containing 8 adjacent points
+  if (point > 0) {
+    // number of nearby cells with no info
     int no_inf_count = 0;
-    int inscribed_count = 0;
-    int adjacent_points[16];
-    /*
-     * Now take one point and lookup all adjacent points (surrounding points).
-     * The variable adjacentPoints contains all neighboring point (up, right, left ...)
-     */
+    int adjacent_points[8];
 
-    /*
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[0]);
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[1]);
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[2]);
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[3]);
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[4]);
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[5]);
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[6]);
-       ROS_DEBUG("Adjacent Point: %d",adjacentPoints[7]);
-       */
-
-    //histogram[(int)occupancy_grid_array_[point]]++;
-
-    if ((int) occupancy_grid_array_[point] == costmap_2d::FREE_SPACE)//<= threshold_free)
+    if ((int) occupancy_grid_array_[point] == costmap_2d::FREE_SPACE)
     {
       getAdjacentPoints(point, adjacent_points);
-      for (int i = 0; i < 16; i++) // length of adjacent_points array
+      for (int i = 0; i < 8; i++)
       {
-
-        if (occupancy_grid_array_[adjacent_points[i]] == costmap_2d::NO_INFORMATION) {
+        if (occupancy_grid_array_[adjacent_points[i]] == costmap_2d::NO_INFORMATION) 
+        {
           no_inf_count++;	
-          //                                        ROS_DEBUG("No information found!");
         } 
         else if (occupancy_grid_array_[adjacent_points[i]] == costmap_2d::LETHAL_OBSTACLE) {
-          /*
-           * Do not break here ... In some scenarios it may happen that unknown and free space
-           * form a border, but if just a small corridor is available there, it would not be
-           * detected as frontier, since even one neighboring block is an inflated block.
-           * Therefore do nothing, if even one unknown block is a neighbor of an free space
-           * block, then it is a frontier!
-           */
-
-          //inscribed_count++;
-          //                                        ROS_DEBUG("Obstacle found");
           return(0);
         }
       }
-
-      /*
-       * Count the number of lethal obstacle (unknown space also included
-       * here). If an inflated obstacle was detected ... the point is not
-       * a possible frontier and should no longer be considered.
-       * Otherwise, when all surronding blocks --> 64+7 are unknown just the
-       * one in the middle is free space, then we found a frontier!!
-       * On every found frontier, true is returned
-       */
       if (no_inf_count > 0)
       {
-        /*
-         * Above a adjacent Point is taken and compared with NO_INFORMATION.
-         * If the point contains no information, the next surrounding point from that point
-         * is taken and again compared with NO_INFORMATION. If there are at least
-         * two points with no information surrounding a no information point, then return true!
-         * (at least two points with no information means that there is sufficient space
-         * with not enough information about)
-         */
-
-        //return(backoff(point));
-        ;                           return(point);
+        return(point);
       }
     }
   }
   return(0);
-}
-
-
-int ExplorationPlanner::backoff (int point)
-{
-  if(occupancy_grid_array_[up(point)] == costmap_2d::NO_INFORMATION && occupancy_grid_array_[left(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(downright(downright(downright(point))));
-  }
-  if(occupancy_grid_array_[up(point)] == costmap_2d::NO_INFORMATION && occupancy_grid_array_[right(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(downleft(downleft(downleft(point))));
-  }
-  if(occupancy_grid_array_[down(point)] == costmap_2d::NO_INFORMATION && occupancy_grid_array_[left(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(upright(upright(upright(point))));
-  }
-  if(occupancy_grid_array_[down(point)] == costmap_2d::NO_INFORMATION && occupancy_grid_array_[right(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(upleft(upleft(upleft(point))));
-  }
-
-
-  if(occupancy_grid_array_[right(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(left(left(left(point))));
-  }
-  if(occupancy_grid_array_[down(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(up(up(up(point))));
-  }
-  if(occupancy_grid_array_[left(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(right(right(right(point))));
-  }
-  if(occupancy_grid_array_[up(point)] == costmap_2d::NO_INFORMATION)
-  {
-    return(down(down(down(point))));
-  }
-
-  //				if(occupancy_grid_array_[upleft(point)] == costmap_2d::NO_INFORMATION)
-  //				{
-  //					return(downright(downright(point)));
-  //				}
-  //				if(occupancy_grid_array_[upright(point)] == costmap_2d::NO_INFORMATION)
-  //				{
-  //					return(downleft(downleft(point)));
-  //				}
-  //				if(occupancy_grid_array_[downright(point)] == costmap_2d::NO_INFORMATION)
-  //				{
-  //					return(upleft(upleft(point)));
-  //				}
-  //				if(occupancy_grid_array_[downleft(point)] == costmap_2d::NO_INFORMATION)
-  //				{
-  //					return(upright(upright(point)));
-  //				}
-  else
-  {
-    return(point);
-  }
 }
 
 bool ExplorationPlanner::isFrontierReached(int point) {
@@ -5390,49 +4902,6 @@ bool ExplorationPlanner::isFrontierReached(int point) {
 }
 
 inline void ExplorationPlanner::getAdjacentPoints(int point, int points[]) {
-
-  /*
-   * Get all surrounding neighbors and the neighbors of those.
-   */
-
-  /*
-   * 		ooo ooo
-   *
-   */
-
-  /*
-     points[0] = left(point);
-     points[1] = right(point);
-     points[2] = left(points[0]);
-     points[3] = right(points[1]);
-     points[4] = left(points[2]);
-     points[5] = right(points[3]);
-     points[6] = left(points[4]);
-     points[7] = right(points[5]);
-     */
-
-  /*
-   *            o
-   *          o   o
-   *            o
-   *
-   */
-
-  /*
-     points[0] = left(point);
-     points[1] = up(point);
-     points[2] = right(point);
-     points[3] = down(point);
-     */
-
-  /*
-   *          o o o
-   *          o   o
-   *          o o o
-   *
-   */
-
-
   points[0] = left(point);
   points[1] = up(point);
   points[2] = right(point);
@@ -5441,83 +4910,23 @@ inline void ExplorationPlanner::getAdjacentPoints(int point, int points[]) {
   points[5] = upright(point);
   points[6] = downright(point);
   points[7] = downleft(point);
-
-  /*
-   *        *   *   *
-   *          o o o
-   *        * o   o *
-   *          o o o
-   *        *   *   *
-   */
-
-  points[8] =  left(points[0]);
-  points[9] =  up(points[1]);
-  points[10] = right(points[2]);
-  points[11] = down(points[3]);
-  points[12] = upleft(points[4]);
-  points[13] = upright(points[5]);
-  points[14] = downright(points[6]);
-  points[15] = downleft(points[7]);
-
-
-  /*
-   *        * + * + *
-   *        + o o o +
-   *        * o   o *
-   *        + o o o +
-   *        * + * + *
-   */
-  /*
-     points[16] = up(points[4]);
-     points[17] = up(points[5]);
-     points[18] = right(points[5]);
-     points[19] = right(points[6]);
-     points[20] = down(points[6]);
-     points[21] = down(points[7]);
-     points[22] = left(points[7]);
-     points[23] = left(points[4]);
-     */
-
-  /*
-   *      #     #     #
-   *        *   *   *
-   *          o o o
-   *      # * o   o * #
-   *          o o o
-   *        *   *   *
-   *      #     #     #
-   */
-  /*
-     points[16] = left(points[8]);
-     points[17] = up(points[9]);
-     points[18] = right(points[10]);
-     points[19] = down(points[11]);
-     points[20] = upleft(points[12]);
-     points[21] = upright(points[13]);
-     points[22] = downright(points[14]);
-     points[23] = downleft(points[15]);
-     */
 }
 
 bool ExplorationPlanner::countCostMapBlocks(int point) {	
 
   if (occupancy_grid_array_[point] == costmap_2d::NO_INFORMATION) {
-    //		ROS_DEBUG("[isFree] NO_INFORMATION");
     unknown++;
     return true;
   } else if ((int) occupancy_grid_array_[point] == costmap_2d::FREE_SPACE) {
     free++;
-    //		ROS_DEBUG("[isFree] FREE SPACE FOUND");
     return true;
   }
 
   else if ((int) occupancy_grid_array_[point] == costmap_2d::LETHAL_OBSTACLE) {
     lethal++;
-    //		ROS_DEBUG("[isFree] LETHAL OBSTACLE FOUND");
     return true;
   } else if ((int) occupancy_grid_array_[point] == costmap_2d::INSCRIBED_INFLATED_OBSTACLE) {
     inflated++;
-    //		ROS_DEBUG("[isFree] INSCRIBED INFLATED OBSTACLE FOUND");
     return true;
   } else 
   {
@@ -5527,20 +4936,6 @@ bool ExplorationPlanner::countCostMapBlocks(int point) {
     return true;
   }
   return false;
-}
-
-bool ExplorationPlanner::isFree(int point) {
-  if (isValid(point)) {
-
-    return true;
-  } else {
-    ROS_ERROR("Point is not valid! Reason: negative number ");
-  }
-  return false;
-}
-
-inline bool ExplorationPlanner::isValid(int point) {
-  return (point >= 0);
 }
 
 void ExplorationPlanner::clearFrontiers() {
@@ -5602,6 +4997,4 @@ inline int ExplorationPlanner::downleft(int point) {
     return point + map_width_ - 1;
   }
   return -1;
-
 }
-

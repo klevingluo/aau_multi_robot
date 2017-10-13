@@ -6,9 +6,6 @@
 #include <cerrno>
 #include "adhoc_communication/MmPoint.h"
 
-//#define DEA_OPT_MAP_CHANGED
-//#define DEA_OPT_PARTIAL_MERGE
-//#define DEBUG
 MapMerger::MapMerger() {    
   pos_seq_my = 0;
   pos_pub_other = new std::vector<ros::Publisher>();
@@ -22,7 +19,6 @@ MapMerger::MapMerger() {
   updateMan = new updateManager();
 
   positions = new adhoc_communication::MmListOfPoints();
-  //since_last_trans_try = 0;
   map_data = new std::vector<nav_msgs::OccupancyGrid*>();
   robots = new std::vector<std::string>();
   transforms = new std::vector<cv::Mat>();
@@ -71,7 +67,6 @@ MapMerger::MapMerger() {
   nodeHandle->param<std::string>("local_map_topic",local_map_topic,"/map");
   nodeHandle->param<std::string>("local_map_metadata_topic",local_map_metadata_topic,"/map_metadata");
   nodeHandle->param<std::string>("local_map_frame_id",local_map_frame_id,"map");
-  //nodeHandle->param<std::string>("meta_topic_over_network",map_meta_topic,"/map_meta");
   nodeHandle->param<std::string>("map_topic_over_network",topic_over_network,"map_other");
   nodeHandle->param<std::string>("position_local_robot_topic",position_local_robot_topic,"slam_out_pose");
   nodeHandle->param<std::string>("position_other_robots_topic",position_other_robots_topic,"position_other_robots");
@@ -80,56 +75,13 @@ MapMerger::MapMerger() {
   nodeHandle->param<std::string>("log_path",log_path,"");
 
   time_start = ros::Time::now();
-  /* if(has_local_map == false)
-     robot_name = "BASE";
-     robot_hostname = robot_name;*/
-  //DEBUG
-#ifdef DEBUG
 
-  //robot_name="robot_1";
-  // robot_prefix="/robot_1";
-  // local_map_topic = "/robot_1/map";
-  // local_map_metadata_topic="/robot_1/map_metadata";
-  //map_meta_topic="map_meta";
-  // local_map_frame_id="robot_1/map";
-  // topic_over_network = "/robot_1/map_other";
-  // position_other_robots_topic = "/robot_1/position_other_robots";
-  splitted = true;
-  size=2048;
-  has_local_map = false;
-  map_width = 2976;
-  map_height = 2976;
-  /*
-     robot_name="robot_0";
-     robot_prefix="/robot_0";
-     local_map_topic = "/robot_0/map";
-     local_map_metadata_topic="/robot_0/map_metadata";
-     map_meta_topic="map_meta";
-     local_map_frame_id="robot_0/map";
-     topic_over_network = "/robot_0/map_other";
-     position_other_robots_topic = "/robot_0/position_other_robots";
-     splitted = true;
-     size=688;*
-     has_local_map = false;
-     robot_name = "BASE";
-     robot_prefix = "/robot_2";
-     robot_hostname = "robot_2";*/
-#endif
-  //END DBEUG
-
-  ROS_INFO("Local map topic:%s",local_map_topic.c_str());
-  ROS_INFO("Local map meta data:%s",local_map_metadata_topic.c_str());
-  ROS_INFO("Width:%i",map_width);
-  ROS_INFO("Height:%i",map_height);
-  ROS_INFO("Splitted:%i",splitted);
-  ROS_INFO("Has local map:%i",has_local_map);
-  ROS_INFO("Split size:%i",size);
-  ROS_INFO("Robot name:%s",robot_name.c_str());
-  ROS_INFO("Prefix:%s",robot_prefix.c_str());
-  ROS_INFO("Local Map Frame:%s",local_map_frame_id.c_str());
   robot_hostname = robot_name;
-
 }
+
+/**
+ * loads map size, now a part of the occupancy grid, instead of a separate metadata topic
+ */
 void MapMerger::waitForLocalMetaData() {
   ROS_INFO("Wait for map, on topic:[%s]",local_map_topic.c_str());
   ros::Subscriber  sub = nodeHandle->subscribe(local_map_topic,1000,&MapMerger::callback_map_meta_data_local,this);
@@ -150,9 +102,7 @@ void MapMerger::waitForRobotInformation() {
   ROS_INFO("Wait to get a map from other robot");
   ros::Subscriber sub =nodeHandle->subscribe(robot_prefix+"/adhoc_communication/new_robot",
       1000,&MapMerger::callback_got_robot_for_data,
-
       this);
-
 
   ros::ServiceClient getNeighborsClient = nodeHandle->serviceClient<adhoc_communication::GetNeighbors>
     (robot_prefix+"/adhoc_communication/get_neighbors");
@@ -995,7 +945,6 @@ void MapMerger::processLocalMap(nav_msgs::OccupancyGrid * toInsert,int index)
 
 void MapMerger::processMap(nav_msgs::OccupancyGrid *map,int index_in_mapdata)
 {
-  //since_last_trans_try++;
   ROS_DEBUG("Process Map Splitted");
 
   if(map_data->size() < index_in_mapdata+1)
@@ -1008,8 +957,6 @@ void MapMerger::processMap(nav_msgs::OccupancyGrid *map,int index_in_mapdata)
 }
 
 void MapMerger::processPosition(geometry_msgs::PoseStamped * pose) {
-  //ros::nodeHandle nodeHandle ("~");
-  //broadcast to all with map and set frame ID to mine
   ros::ServiceClient client = nodeHandle->serviceClient<adhoc_communication::SendMmRobotPosition>
     (robot_prefix + "/adhoc_communication/send_position");
   adhoc_communication::SendMmRobotPosition exchange;
@@ -1017,7 +964,6 @@ void MapMerger::processPosition(geometry_msgs::PoseStamped * pose) {
   exchange.request.dst_robot = "mc_"+robot_name;
   exchange.request.position.position.pose = pose->pose;
   exchange.request.position.src_robot = robot_name;
-  //exchange. = robot_name;
   if(client.call(exchange))
   {
     if(exchange.response.status)
@@ -1031,12 +977,11 @@ void MapMerger::processPosition(geometry_msgs::PoseStamped * pose) {
 
 void MapMerger::start()
 {
-  //ros::NodeHandle nodeHandle;
   ROS_INFO("Started MapMerger");
   ROS_INFO("Subscribe map topic [%s]",local_map_topic.c_str());
 
-
   ros::Subscriber  sub = nodeHandle->subscribe(local_map_topic,1000,&MapMerger::callback_map,this);
+
   ros::Duration(0.1).sleep();
   ros::spinOnce();
 
@@ -1048,14 +993,10 @@ void MapMerger::start()
   ros::Subscriber  sub_other_maps = nodeHandle->subscribe(robot_prefix+"/"+topic_over_network,1000,&MapMerger::callback_map_other,this);
   ros::Duration(0.1).sleep();
   ros::spinOnce();
-  //#ifndef DEBUG
 
   ros::Subscriber  sub_new_robot = nodeHandle->subscribe(robot_prefix+"/adhoc_communication/new_robot",1000,&MapMerger::callback_new_robot,this);
   ros::Duration(0.1).sleep();
   ros::spinOnce();
-  //#else
-  //  ros::Subscriber sub_new_robot =  nodeHandle->subscribe("/robot_1/new_robot",1000,&MapMerger::callback_new_robot,this);
-  //#endif
   ros::Subscriber  sub_position_local,sub_position_network;
   if(exchange_position) {
     ROS_INFO("Creating position stuff");
@@ -1849,12 +1790,10 @@ void MapMerger::sendBackAskedMapData(string robotName, std::vector<int> missingU
   }
   ROS_INFO("Sending missed map updates to %s",robotName.c_str());
   std::vector<int>* containedUpdates = new std::vector<int>();
-  //todo here all map updates which are included
   containedUpdates->push_back(update_seq);
   sendMapOverNetwork(robotName,containedUpdates,min_x,min_y,max_x,max_y);
   delete containedUpdates;
 }
-
 
 void MapMerger::sendControlMessage(std::vector<int>* updateNumbers,std::string dest) {
   ros::ServiceClient client = nodeHandle->serviceClient<adhoc_communication::SendMmControl>(robot_prefix +"/adhoc_communication/send_control_message");
