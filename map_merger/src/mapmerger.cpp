@@ -80,6 +80,42 @@ MapMerger::MapMerger() {
   nodeHandle->param<std::string>("log_path",log_path,"");
 
   time_start = ros::Time::now();
+  /* if(has_local_map == false)
+     robot_name = "BASE";
+     robot_hostname = robot_name;*/
+  //DEBUG
+#ifdef DEBUG
+
+  //robot_name="robot_1";
+  // robot_prefix="/robot_1";
+  // local_map_topic = "/robot_1/map";
+  // local_map_metadata_topic="/robot_1/map_metadata";
+  //map_meta_topic="map_meta";
+  // local_map_frame_id="robot_1/map";
+  // topic_over_network = "/robot_1/map_other";
+  // position_other_robots_topic = "/robot_1/position_other_robots";
+  splitted = true;
+  size=2048;
+  has_local_map = false;
+  map_width = 2976;
+  map_height = 2976;
+  /*
+     robot_name="robot_0";
+     robot_prefix="/robot_0";
+     local_map_topic = "/robot_0/map";
+     local_map_metadata_topic="/robot_0/map_metadata";
+     map_meta_topic="map_meta";
+     local_map_frame_id="robot_0/map";
+     topic_over_network = "/robot_0/map_other";
+     position_other_robots_topic = "/robot_0/position_other_robots";
+     splitted = true;
+     size=688;*
+     has_local_map = false;
+     robot_name = "BASE";
+     robot_prefix = "/robot_2";
+     robot_hostname = "robot_2";*/
+#endif
+  //END DBEUG
 
   ROS_INFO("Local map topic:%s",local_map_topic.c_str());
   ROS_INFO("Local map meta data:%s",local_map_metadata_topic.c_str());

@@ -26,9 +26,7 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "math.h"
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
-#include <opencv2/features2d/features2d.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+
 
 StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, float max_pairwise_distance, cv::Mat oldTransform) {
 
@@ -42,30 +40,27 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
       cv::resize(image2,image2,image1.size());
 
   // create feature detector set.
-  Ptr<DescriptorMatcher> dematc = cv::DescriptorMatcher::create("BruteForce-Hamming");
   Ptr<ORB> detector = ORB::create();
+  DescriptorExtractor dexc;
+  BFMatcher dematc(NORM_HAMMING, false);
 
   // 1. extract keypoints
   detector->detect(image1, kpv1);
   detector->detect(image2, kpv2);
 
   // 2. extract descriptors
-  detector->compute(image1, kpv1, dscv1);
-  detector->compute(image2, kpv2, dscv2);
+  dexc.compute(image1, kpv1, dscv1);
+  dexc.compute(image2, kpv2, dscv2);
 
   // 3. match keypoints
   // seems to need 450 kpv for a good match - kevin
-  if(kpv1.size() < 300 || kpv2.size() < 300 ) {
-      ROS_INFO("Not enough KPV");
-      ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries\t matches: %i",
-          static_cast<int>(kpv1.size()),
-          static_cast<int>(kpv2.size()), 
-          static_cast<int>(matches.size()));
+  if(kpv1.size() < 450 || kpv2.size() < 450 ) {
+      ROS_WARN("Not enough KPV");
       works = false;
       return;
   }
 
-  dematc->match(dscv1, dscv2, matches);
+  dematc.match(dscv1, dscv2, matches);
   ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries\t matches: %i",
       static_cast<int>(kpv1.size()),
       static_cast<int>(kpv2.size()), 
@@ -136,9 +131,13 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
 
   float scale_change = 0.05;
 
-  if(scalex > 1 + scale_change || scaley > 1 + scale_change || scalex < 1 - scale_change|| scaley < 1 - scale_change) {
-      ROS_WARN("map is scaled too much");
-      ROS_WARN("H: transx:%f|transy%f|scalex:%f,scaley:%f|rotation:%f",transx,transy,scalex,scaley,rotation);
+  if(scalex > 1 + scale_change || scaley > 1 + scale_change) {
+      ROS_WARN("Map should not scale change is to lagre");
+      works = false;
+      return;
+  }
+  if(scalex < 1 - scale_change|| scaley < 1 - scale_change) {
+      ROS_WARN("Map should not scale change is to small");
       works = false;
       return;
   }
@@ -163,7 +162,7 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   // the current transform, used as a starting point for future transforms
   cur_trans = H;
   ROS_DEBUG("Finished estimateRigid");
-  //evaluate transformation
+  //evaluade transformation
   
   if(works) {
       Mat tmp (image2.size(),image2.type());
