@@ -111,15 +111,13 @@ private:
     std::vector<cv::Mat>* transforms;
     std::vector<bool>* new_data_maps;
     std::vector<UpdateEntry>* formerUpdates;
-    std::vector<ros::Publisher> *robots_position_publisher;
     ros::Publisher  list_of_positions_publisher;
     //std::vector<adhoc_communication::
     adhoc_communication::MmListOfPoints * positions;
     int map_width,map_height,size,
         seconds_meta_timer,seconds_publish_timer,
         seconds_send_timer,seconds_recompute_transform,
-	seconds_send_position,
-        laser_range,updateCount;
+        seconds_send_position, updateCount;
     std::vector<nav_msgs::OccupancyGrid*>* map_data;
     std::vector<UpdateEntry*>* update_list;
     nav_msgs::OccupancyGrid * global_map, * local_map, * local_map_old;

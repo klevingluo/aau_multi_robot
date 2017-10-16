@@ -595,7 +595,7 @@ class Explorer {
          * *****************************************************
          */
 
-        exploration->visualize_Cluster_Cells();
+        exploration->visualizeClustersConsole();
         exploration->visualize_Frontiers();
 
         if(goal_determined)
@@ -932,7 +932,7 @@ class Explorer {
             break;
           }
         }
-        exploration->visualize_Cluster_Cells();
+        exploration->visualizeClustersConsole();
       }
 
       global_iterattions++;

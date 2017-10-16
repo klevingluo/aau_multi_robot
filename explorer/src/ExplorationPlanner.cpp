@@ -149,11 +149,33 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   pub_cluster_grid_18 = nh_cluster_grid.advertise<nav_msgs::GridCells>("cluster_grid_18", 2000, true);
   pub_cluster_grid_19 = nh_cluster_grid.advertise<nav_msgs::GridCells>("cluster_grid_19", 2000, true);
 
-  sub_frontiers = nh_frontier.subscribe(robo_name+"/frontiers", 10000, &ExplorationPlanner::frontierCallback, this);
-  sub_visited_frontiers = nh_visited_frontier.subscribe(robo_name+"/visited_frontiers", 10000, &ExplorationPlanner::visited_frontierCallback, this);
-  sub_negotioation = nh_negotiation.subscribe(robo_name+"/negotiation_list", 10000, &ExplorationPlanner::negotiationCallback, this); 
-  sub_auctioning = nh_auction.subscribe(robo_name+"/auction", 1000, &ExplorationPlanner::auctionCallback, this); 
-  sub_position = nh_position.subscribe(robo_name+"/all_positions", 1000, &ExplorationPlanner::positionCallback, this);
+  sub_frontiers = nh_frontier.subscribe(robo_name+"/frontiers", 
+      10000, 
+      &ExplorationPlanner::frontierCallback, 
+      this);
+
+  sub_visited_frontiers = nh_visited_frontier.subscribe(
+      robo_name+"/visited_frontiers", 
+      10000, 
+      &ExplorationPlanner::visited_frontierCallback, 
+      this);
+
+  sub_negotioation = nh_negotiation.subscribe(
+      robo_name+"/negotiation_list", 
+      10000, 
+      &ExplorationPlanner::negotiationCallback, 
+      this); 
+
+  sub_auctioning = nh_auction.subscribe(
+      robo_name+"/auction", 
+      1000, 
+      &ExplorationPlanner::auctionCallback, 
+      this); 
+
+  sub_position = nh_position.subscribe(robo_name+"/all_positions", 
+      1000, 
+      &ExplorationPlanner::positionCallback, 
+      this);
 
   srand((unsigned)time(0));
 }
@@ -332,7 +354,6 @@ bool ExplorationPlanner::clusterFrontiers() {
     {
       run_without_merging = true;
     }  
-    //        ROS_INFO("RUN WITHOUT MERGING: %d", run_without_merging);
   } 
 }
 
@@ -828,20 +849,6 @@ void ExplorationPlanner::home_position_(const geometry_msgs::PointStamped::Const
   home_position_y_ = msg.get()->point.y;
 }
 
-/*
- * output the frontiers to the console
- */
-void ExplorationPlanner::printFrontiers() {
-  for(int i = 0; i < frontiers.size(); i++) {
-    if(robot_prefix_empty_param == true) {
-      ROS_INFO("Frontier %d:   x: %f   y: %f   robot: %s", frontiers.at(i).id, frontiers.at(i).x_coordinate, frontiers.at(i).y_coordinate, frontiers.at(i).detected_by_robot_str.c_str());
-    }else
-    {
-      ROS_INFO("Frontier %d:   x: %f   y: %f", frontiers.at(i).id, frontiers.at(i).x_coordinate, frontiers.at(i).y_coordinate);
-    }
-  }
-}
-
 /**
  * adds a frontier to the frontiers list
  */
@@ -918,9 +925,7 @@ bool ExplorationPlanner::removeStoredFrontier(int id, std::string detected_by_ro
 
 bool ExplorationPlanner::storeVisitedFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id)
 {
-
   frontier_t visited_frontier;
-
 
   if(robot_prefix_empty_param == true)
   {        
@@ -983,44 +988,10 @@ bool ExplorationPlanner::storeVisitedFrontier(double x, double y, int detected_b
   return true;
 }
 
-bool ExplorationPlanner::removeVisitedFrontier(int id, std::string detected_by_robot_str)
-{
-  for(int i= 0; i< visited_frontiers.size(); i++)
-  {
-    if(robot_prefix_empty_param == true)
-    {
-
-      if(visited_frontiers.at(i).id == id && visited_frontiers.at(i).detected_by_robot_str.compare(detected_by_robot_str) == 0)
-      {
-        ROS_INFO("Removing Visited Frontier ID: %d  at position: %d  of Robot: %s", visited_frontiers.at(i).id, i, visited_frontiers.at(i).detected_by_robot_str.c_str());
-        store_visited_mutex.lock();
-        visited_frontiers.erase(visited_frontiers.begin()+i);
-        //                if(i > 0)
-        //                {
-        //                    i --;
-        //                }
-        store_visited_mutex.unlock();
-        break;
-      }
-    }else
-    {
-      if(visited_frontiers.at(i).id == id)
-      {
-        store_visited_mutex.lock();
-        visited_frontiers.erase(visited_frontiers.begin()+i);
-        if(i > 0)
-        {
-          i --;
-        }
-        store_visited_mutex.unlock();
-        break;
-      }
-    } 
-  }
-  return true; 
-}
-
-// store a new frontier, mark it as unreachable, then check it it is in any existing clusters, add to unreachable count if so
+/**
+ * store a new frontier, mark it as unreachable, 
+ * then check it it is in any existing clusters, add to unreachable count if so
+ */
 bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id)
 {
   frontier_t unreachable_frontier;
@@ -1085,40 +1056,6 @@ bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detect
 
 }
 
-bool ExplorationPlanner::removeUnreachableFrontier(int id, std::string detected_by_robot_str)
-{
-  for(int i= 0; i< unreachable_frontiers.size(); i++)
-  {
-    if(robot_prefix_empty_param == true)
-    {
-      if(unreachable_frontiers.at(i).id == id && unreachable_frontiers.at(i).detected_by_robot_str.compare(detected_by_robot_str) == 0)
-      {
-        ROS_INFO("Removing Unreachable Frontier ID: %d  at position: %d  of Robot: %s", unreachable_frontiers.at(i).id, i, unreachable_frontiers.at(i).detected_by_robot_str.c_str());
-
-        unreachable_frontiers.erase(unreachable_frontiers.begin()+i);
-        //                if(i > 0)
-        //                {
-        //                    i --;
-        //                }
-        break;
-      }
-    }else
-    {
-      if(unreachable_frontiers.at(i).id == id)
-      {
-        unreachable_frontiers.erase(unreachable_frontiers.begin()+i);
-        if(i > 0)
-        {
-          i --;
-        }
-        break;
-      }
-    }
-  }
-
-  return true;
-}
-
 bool ExplorationPlanner::publish_negotiation_list(frontier_t negotiation_frontier, int cluster_number)
 {
   adhoc_communication::ExpFrontier negotiation_msg;
@@ -1130,7 +1067,7 @@ bool ExplorationPlanner::publish_negotiation_list(frontier_t negotiation_frontie
     {
       if(clusters.at(i).id == cluster_number)
       {
-        ROS_DEBUG("Cluster ID: %d   is at vector position: %d", cluster_number, i);
+        ROS_DEBUG("Cluster ID: %d is at vector position: %d", cluster_number, i);
         cluster_vector_position = i;
         break;
       }
@@ -1170,10 +1107,8 @@ bool ExplorationPlanner::publish_negotiation_list(frontier_t negotiation_frontie
   first_negotiation_run = false; 
 }
 
-
 bool ExplorationPlanner::sendToMulticast(std::string multi_cast_group, adhoc_communication::ExpFrontier frontier_to_send, std::string topic)
 {
-  //    ROS_INFO("SENDING frontier id: %ld    detected_by: %ld", frontier_to_send.id ,frontier_to_send.detected_by_robot);
   adhoc_communication::SendExpFrontier service_frontier; // create request of type any+
 
   std::stringstream robot_number;
@@ -1216,8 +1151,10 @@ bool ExplorationPlanner::sendToMulticast(std::string multi_cast_group, adhoc_com
   }
 }
 
-
-bool ExplorationPlanner::sendToMulticastAuction(std::string multi_cast_group, adhoc_communication::ExpAuction auction_to_send, std::string topic)
+bool ExplorationPlanner::sendToMulticastAuction(
+    std::string multi_cast_group, 
+    adhoc_communication::ExpAuction auction_to_send, 
+    std::string topic)
 {
   adhoc_communication::SendExpAuction service_auction; // create request of type any+
 
@@ -1228,12 +1165,10 @@ bool ExplorationPlanner::sendToMulticastAuction(std::string multi_cast_group, ad
 
   if(robot_prefix_empty_param == true)
   {
-    //        robo_name = lookupRobotName(robot_name);
     robo_name = robot_str;
   }
 
   std::string destination_name = multi_cast_group + robo_name; //for multicast
-  //    std::string destination_name = robo_name; // unicast
 
   ROS_INFO("sending auction to multicast group '%s' on topic '%s'",destination_name.c_str(), topic.c_str());
   service_auction.request.dst_robot = destination_name; 
@@ -1264,8 +1199,6 @@ bool ExplorationPlanner::sendToMulticastAuction(std::string multi_cast_group, ad
 
 void ExplorationPlanner::negotiationCallback(const adhoc_communication::ExpFrontier::ConstPtr& msg)
 {  
-  //        ROS_ERROR("Negotiation List!!!");
-
   bool entry_found = false;
 
   adhoc_communication::ExpFrontierElement frontier_element; 
@@ -1305,14 +1238,8 @@ void ExplorationPlanner::negotiationCallback(const adhoc_communication::ExpFront
   }
 }
 
-bool ExplorationPlanner::respondToAuction(std::vector<requested_cluster_t> requested_cluster_ids, int auction_id_number) {   
-  //    ros::Rate r(1);
-  //    while(ros::ok())
-  //    {
-  //        r.sleep();
-  ////        while(start_thr_auction == false);
-  //        if(start_thr_auction == true)
-  //        {
+bool ExplorationPlanner::respondToAuction(std::vector<requested_cluster_t> requested_cluster_ids, int auction_id_number) {
+
   ROS_INFO("Respond to auction");
   adhoc_communication::ExpAuction auction_msgs;
 
@@ -1383,8 +1310,7 @@ bool ExplorationPlanner::respondToAuction(std::vector<requested_cluster_t> reque
   start_thr_auction = false; 
   //        }
   //    }
-}
-
+  }
 
 int ExplorationPlanner::calculateAuctionBID(int cluster_number, std::string strategy)
 {
@@ -1399,16 +1325,9 @@ int ExplorationPlanner::calculateAuctionBID(int cluster_number, std::string stra
     {
       if(clusters.at(i).id == cluster_number)
       {
-        //                if(clusters.at(i).cluster_element.size() > 0)
-        //                {
         cluster_vector_position = i; 
         cluster_could_be_found = true;
         break;
-        //                }else
-        //                {
-        //                    ROS_ERROR("Cluster found but empty, therefore do not calculate LOCAL BID");                   
-        //                    return(-1);
-        //                }
       }
     }                      
   }
@@ -1476,7 +1395,6 @@ int ExplorationPlanner::calculateAuctionBID(int cluster_number, std::string stra
   return(-1);
 }
 
-
 void ExplorationPlanner::positionCallback(const adhoc_communication::MmListOfPoints::ConstPtr& msg)
 {
   ROS_DEBUG("Position Callback !!!!!");
@@ -1491,11 +1409,9 @@ void ExplorationPlanner::positionCallback(const adhoc_communication::MmListOfPoi
   position_mutex.unlock();
 }
 
-
 void ExplorationPlanner::auctionCallback(const adhoc_communication::ExpAuction::ConstPtr& msg)
 {
   auction_running = true;
-  //ROS_ERROR("CALLING AUCTION CALLBACK!!!!!!!!!!!!");
   int robots_int_name;
 
   bool same_robot = false; 
@@ -1505,10 +1421,9 @@ void ExplorationPlanner::auctionCallback(const adhoc_communication::ExpAuction::
     {
       same_robot = true; 
     }
-  }else
+  } else
   {
     robots_int_name = atoi(msg.get()->robot_name.c_str());
-    ROS_INFO("Robot name: %d      int_name: %d",robot_name, robots_int_name);
     if(robots_int_name == robot_name)
     {
       same_robot = true; 
@@ -1537,9 +1452,6 @@ void ExplorationPlanner::auctionCallback(const adhoc_communication::ExpAuction::
     clearVisitedAndSeenFrontiersFromClusters();
     clusterFrontiers();
 
-
-    //        visualize_Cluster_Cells();
-
     if(msg.get()->auction_status_message == true)
     { 
       ROS_INFO("Calling Auction Status");
@@ -1553,12 +1465,8 @@ void ExplorationPlanner::auctionCallback(const adhoc_communication::ExpAuction::
         adhoc_communication::ExpCluster cluster_req; 
         cluster_req = msg.get()->requested_clusters.at(i);
         std::string requested_clusters; 
-        for(int j = 0; j < cluster_req.ids_contained.size(); j++)
+        for(int j = 0; j < cluster_req.ids_contained.size() && j < 6; j++)
         {
-          if(j >= 6)
-          {
-            break;
-          }
           requested_clusters.append(NumberToString((int)cluster_req.ids_contained.at(j).id));
           requested_clusters.append(", ");
         }
@@ -1805,7 +1713,6 @@ void ExplorationPlanner::auctionCallback(const adhoc_communication::ExpAuction::
   auction_running = false;
 }
 
-
 bool sortCompareElements(const ExplorationPlanner::compare_pair_t &lhs, const ExplorationPlanner::compare_pair_t &rhs)
 {       
   return lhs.identical_ids > rhs.identical_ids;    
@@ -1813,38 +1720,19 @@ bool sortCompareElements(const ExplorationPlanner::compare_pair_t &lhs, const Ex
 
 int ExplorationPlanner::checkClustersID(adhoc_communication::ExpCluster cluster_to_check)
 {
-  //    ROS_INFO("Check for cluster id");
   std::vector<compare_pair_t> compare_clusters;  
 
-  //        ROS_INFO("------------------- Checking ----------------------");
   std::string requested_clusters;
-
-  //        for(int j = 0; j < cluster_to_check.ids_contained.size(); j++)
-  //        {
-  //            requested_clusters.append(NumberToString((int)cluster_to_check.ids_contained.at(j)));
-  //            requested_clusters.append(", ");
-  //        }
-  //        ROS_INFO("%s", requested_clusters.c_str());
-
-
-
 
   for(int j = 0; j < clusters.size(); j++)
   {
     double same_id_found = 0;
-    //        ROS_INFO("--------------------------------------------------------------");
     for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
     {
-      //            for(int m= 0; m < clusters.at(j).cluster_element.size(); m++)
-      //            {
-      //                ROS_INFO("Ids in cluster to check with: %d",clusters.at(j).cluster_element.at(m).id);
-      //            }
-      //            ROS_INFO("Ids in cluster to check with: %d",clusters.at(j).cluster_element.at(n).id);
       for(int i = 0; i < cluster_to_check.ids_contained.size(); i++)
       {
         if(robot_prefix_empty_param == true)
         {
-          //                    ROS_INFO("Cluster id: %d  robot: %s     msg id: %d  robot: %s",clusters.at(j).cluster_element.at(n).id, clusters.at(j).cluster_element.at(n).detected_by_robot_str, cluster_to_check.ids_contained.at(i).id, cluster_to_check.ids_contained.at(i).detected_by_robot_str);
           if(clusters.at(j).cluster_element.at(n).id == cluster_to_check.ids_contained.at(i).id && clusters.at(j).cluster_element.at(n).detected_by_robot_str.compare(cluster_to_check.ids_contained.at(i).detected_by_robot_str) == 0)
           {
             same_id_found++;
@@ -1867,70 +1755,13 @@ int ExplorationPlanner::checkClustersID(adhoc_communication::ExpCluster cluster_
     {
       //            ROS_ERROR("NO MATCHING CLUSTER FOUND!!!");
     }
-    //        ROS_INFO("---------------------------------------------------");
-
-    //        ROS_INFO("j: %d   cluster_id: %d", j, clusters.at(j).id);
-    //        compare_pair_t compare_pair; 
-    //        compare_pair.identical_ids = same_id_found;
-    //        compare_pair.cluster_id = clusters.at(j).id;
-    //        compare_clusters.push_back(compare_pair);
-    //        ROS_INFO("Same IDs found: %f   elements*0.7: %f", same_id_found,clusters.at(j).cluster_element.size() * 0.7);
-
-
-    //            if(same_id_found > clusters.at(j).cluster_element.size() * 0.8)
-    //            {
-    //                bool previously_detected = false; 
-    //                for(int m = 0; m < id_previously_detected.size(); m++)
-    //                {
-    //                    if(clusters.at(j).id == id_previously_detected.at(m))
-    //                    {
-    //                        previously_detected = true; 
-    //                        break;
-    //                    }
-    //                }
-    //                if(previously_detected == false)
-    //                {
-    //                    id_previously_detected.push_back(clusters.at(j).id);
-    //                    return (clusters.at(j).id);
-    //                }
-    //            }           
+    return (-1);
   }
-
-  /*
-   * Sort compare_pairs and select the one with the highest similarity
-   */
-  //    if(compare_clusters.size() > 0)
-  //    {
-  //        
-  //        std::sort(compare_clusters.begin(), compare_clusters.end(), sortCompareElements);
-  ////        for(int i = 0; i < compare_clusters.size(); i++)
-  ////        {
-  ////            ROS_INFO("identical: %d    cluster id: %d", compare_clusters.at(i).identical_ids, compare_clusters.at(i).cluster_id);
-  ////        }
-  ////        ROS_INFO("Selected identical: %d    cluster id: %d", compare_clusters.front().identical_ids, compare_clusters.front().cluster_id);
-  //        return(compare_clusters.front().cluster_id);
-  //    }else
-  //    {
-  //        ROS_INFO("Compare Cluster empty");
-  //        return (-1);
-  //    }
-  return (-1);
 }
-
-
-//void ExplorationPlanner::controlCallback( const bla& msg)
-//{
-//    /* Check if manual control or automatic. If automatic, set simulation to false, otherwise set simulation to true in simple_navigation */
-//    
-//    SimpleNavigation.Simulation = true; 
-//}
-
-
 
 void ExplorationPlanner::frontierCallback(const adhoc_communication::ExpFrontier::ConstPtr& msg)
 {  
 
-  //    ROS_ERROR("FRONTIER RECEIVED!!!!!!!!!!!!!!!!!!!!!!!!");
   adhoc_communication::ExpFrontierElement frontier_element; 
   for(int i = 0; i < msg.get()->frontier_element.size(); i++)
   {
@@ -1967,7 +1798,6 @@ void ExplorationPlanner::frontierCallback(const adhoc_communication::ExpFrontier
     }
     if (result == true)
     {
-
       if(robot_prefix_empty_param == true)
       {
         ROS_DEBUG("Received New Frontier with ID: %ld  Robot: %s", frontier_element.id, frontier_element.detected_by_robot_str.c_str());
@@ -1982,7 +1812,6 @@ void ExplorationPlanner::frontierCallback(const adhoc_communication::ExpFrontier
       }
     }
   }
-
 }
 
 
@@ -2140,8 +1969,6 @@ void ExplorationPlanner::clearVisitedAndSeenFrontiersFromClusters()
   ROS_INFO("Clear VisitedAndSeenFrontiers from Cluster");
   std::vector<int> goals_to_clear;
 
-
-
   for(int i = 0; i < clusters.size(); i++)
   {
     for(int j = 0; j < clusters.at(i).cluster_element.size(); j++)
@@ -2176,70 +2003,6 @@ void ExplorationPlanner::clearVisitedAndSeenFrontiersFromClusters()
     }
   }
 
-
-  //    if(visited_frontiers.size() > 1)
-  //    {
-  //        for (int i = 1; i < visited_frontiers.size(); i++)
-  //        {
-  //            bool found_flag = false;
-  //            for (int j = 0; j < clusters.size(); j++)
-  //            {
-  //                for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
-  //                {
-  //                    double diff_x = visited_frontiers.at(i).x_coordinate - clusters.at(j).cluster_element.at(n).x_coordinate;
-  //                    double diff_y = visited_frontiers.at(i).y_coordinate - clusters.at(j).cluster_element.at(n).y_coordinate;
-  //
-  //                    if (fabs(diff_x) <= MAX_GOAL_RANGE && fabs(diff_y) <= MAX_GOAL_RANGE) 
-  //                    {
-  //                        ROS_DEBUG("Erasing visited frontier %d from cluster", clusters.at(j).cluster_element.at(n).id);
-  //                        clusters.at(j).cluster_element.erase(clusters.at(j).cluster_element.begin()+n);
-  //                        if(n > 0)
-  //                        {
-  //                            n --;
-  //                        }
-  //                        found_flag = true;
-  //    //                    break;
-  //                    }
-  //                }
-  //    //            if(found_flag == true)
-  //    //            {
-  //    //                break;
-  //    //            }
-  //            }
-  //        }
-  //    }
-
-  //    if(seen_frontier_list.size() > 1)
-  //    {
-  //        for (int i = 1; i < seen_frontier_list.size(); i++)
-  //        {
-  //            bool found_flag = false;
-  //            for (int j = 0; j < clusters.size(); j++)
-  //            {
-  //                for(int n = 0; n < clusters.at(j).cluster_element.size(); n++)
-  //                {
-  //                    double diff_x = seen_frontier_list.at(i).x_coordinate - clusters.at(j).cluster_element.at(n).x_coordinate;
-  //                    double diff_y = seen_frontier_list.at(i).y_coordinate - clusters.at(j).cluster_element.at(n).y_coordinate;
-  //
-  //                    if (fabs(diff_x) <= MAX_GOAL_RANGE*2 && fabs(diff_y) <= MAX_GOAL_RANGE*2) 
-  //                    {
-  //                        ROS_DEBUG("Erasing seen frontier %d from cluster", clusters.at(j).cluster_element.at(n).id);
-  //                        clusters.at(j).cluster_element.erase(clusters.at(j).cluster_element.begin()+n);
-  //                        if(n > 0)
-  //                        {
-  //                            n --;
-  //                        }
-  //                        found_flag = true;
-  //    //                    break;
-  //                    }
-  //                }
-  //    //            if(found_flag == true)
-  //    //            {
-  //    //                break;
-  //    //            }
-  //            }
-  //        }
-  //    }
   ROS_INFO("Done");
 }
 
@@ -2287,8 +2050,6 @@ void ExplorationPlanner::clearVisitedFrontiers()
 
 void ExplorationPlanner::clearUnreachableFrontiers()
 {
-  //    ROS_INFO("Clear UNREACHABLE");
-
   /* visited_frontier.at(0) is the Home point. Do not compare
    * with this point. Otherwise this algorithm deletes it, a new
    * frontier close to the home point is found which is then again
@@ -2483,7 +2244,7 @@ std::vector<int> ExplorationPlanner::getMapNeighbours(unsigned int point_x, unsi
  * The returned frontiers are in world coordinates.
  */
 void ExplorationPlanner::findFrontiers() {
-// TODO:  fix this, it's a little inefficient, 2 hrs
+  // TODO:  fix this, it's a little inefficient, 2 hrs
 
   ROS_INFO("called find frontiers");
 
@@ -2511,20 +2272,20 @@ void ExplorationPlanner::findFrontiers() {
     costmap_ros_->getCostmap()->indexToCells(allFrontiers.at(i), mx, my);
     costmap_ros_->getCostmap()->mapToWorld(mx, my, wx, wy);
 
-      result = true;
-      // checks to make sure frontiers are far enough apart to store
-      for (unsigned int j = 0; j < frontiers.size(); j++)
-      {
-        if (fabs(wx - frontiers.at(j).x_coordinate) <= MAX_GOAL_RANGE && fabs(wy - frontiers.at(j).y_coordinate) <= MAX_GOAL_RANGE) 
-        {  
-          result = false;
-          break;
-        }
+    result = true;
+    // checks to make sure frontiers are far enough apart to store
+    for (unsigned int j = 0; j < frontiers.size(); j++)
+    {
+      if (fabs(wx - frontiers.at(j).x_coordinate) <= MAX_GOAL_RANGE && fabs(wy - frontiers.at(j).y_coordinate) <= MAX_GOAL_RANGE) 
+      {  
+        result = false;
+        break;
       }
-      if (result == true)
-      {
-        storeFrontier(wx,wy,robot_name,robot_str,-1);
-      }
+    }
+    if (result == true)
+    {
+      storeFrontier(wx,wy,robot_name,robot_str,-1);
+    }
   }
 
   ROS_INFO("Size of all frontiers in the list: %lu", frontiers.size());
@@ -2629,70 +2390,13 @@ bool ExplorationPlanner::auctioning(std::vector<double> *final_goal, std::vector
     auction_msg.auction_id = 10000*robot_name + auction_id_number;
   }
 
-  /*
-   * Following code is to visualize the message being send to the other robots
-   */
-  //    for(int i = 0; i< auction_msg.requested_clusters.size(); i++)
-  //    {
-  //        adhoc_communication::Cluster cluster_req; 
-  //        cluster_req = auction_msg.requested_clusters.at(i);
-  //        ROS_INFO("----------------------- REQUEST %d ---------------------------", i);
-  //        std::string requested_clusters;
-  //        for(int j = 0; j < cluster_req.ids_contained.size(); j++)
-  //        {
-  //            requested_clusters.append(NumberToString((int)cluster_req.ids_contained.at(j)));
-  //            requested_clusters.append(", ");
-  //        }
-  //        ROS_INFO("Auction with auction number: %d", auction_msg.auction_id);
-  //        ROS_INFO("Requested ids: %s", requested_clusters.c_str());
-  //    }
-
-
   std::string numbers_of_operating_robots; 
 
   ROS_INFO("Robot %d starting an auction", robot_name);
 
-  //    if(first_run == true)
-  //    {
-  //        pub_auctioning_first.publish(auction_msg);
-  //    }else
-  //    {
   sendToMulticastAuction("mc_", auction_msg, "auction");
-  //    }
-
-
-
-  /*
-   * Wait for results of others
-   */
-
-
-  //EDIT Peter: I do not know how many answers i get
-  /*
-     nh.param("/robots_in_simulation",number_of_robots, 1);
-     number_of_robots = 2; // To test with two robots if parameter does not work
-     ROS_INFO("++++++++++ number of robots: %d ++++++++++", number_of_robots);
-     */
-
-  //    ros::NodeHandle nh_robots;
-  //    nh_robots.param<std::string>("/robots_in_simulation",numbers_of_operating_robots, "1");
-  //    number_of_robots = atoi(numbers_of_operating_robots.c_str());
-  //    ROS_INFO("++++++++++ number of robots: %d ++++++++++", number_of_robots);
-
-  /*
-   * Number of responding robots is one less since the robot itself does not
-   * respond to its own request
-   */
-  //ROS_INFO("Waiting for results from %d robots", number_of_robots);
-  //wait 4 seconds to receive bids
   ros::Duration(3).sleep();
-  /*
-     while(timer_count < 50 && number_of_auction_bids_received < number_of_robots -1)
-     {
-     ROS_INFO("Waiting for results from %d robots", number_of_robots);
-     timer_count++;
-     ros::Duration(0.2).sleep();
-     }*/
+
   ROS_INFO("number of auction bids received: %d", number_of_auction_bids_received);
 
 
@@ -2700,15 +2404,6 @@ bool ExplorationPlanner::auctioning(std::vector<double> *final_goal, std::vector
     number_of_completed_auctions++;
   else
     number_of_uncompleted_auctions++;
-  /*if(number_of_auction_bids_received < number_of_robots-1)
-    {
-    ROS_ERROR("Wait for other robots timer exceeded");
-    number_of_uncompleted_auctions++;
-    }else if(number_of_auction_bids_received >= number_of_robots - 1)
-    {
-    number_of_completed_auctions++;
-    }*/
-
 
   /*
    * Select the best cluster for yourself
@@ -2720,8 +2415,6 @@ bool ExplorationPlanner::auctioning(std::vector<double> *final_goal, std::vector
    * Stop the auction
    */
   ROS_INFO("Stop the auction");
-  //    auction_status.start_auction = false; 
-  //    auction_status.auction_finished = true; 
 
   auction_msg.start_auction = false; 
   auction_msg.auction_finished = true;
@@ -2729,7 +2422,7 @@ bool ExplorationPlanner::auctioning(std::vector<double> *final_goal, std::vector
   auction_msg.robot_name = robo_name;
   auction_msg.requested_clusters.clear();
 
-  if(cluster_selected_flag == true)// && final_goal->size() >= 4)
+  if(cluster_selected_flag == true)
   {
     /*
      * Tell the others which cluster was selected
@@ -4358,121 +4051,6 @@ void ExplorationPlanner::clear_Visualized_Cluster_Cells(std::vector<int> ids)
     }
   }
 }
-
-
-void ExplorationPlanner::visualize_Cluster_Cells()
-{
-  ROS_INFO("Visualize clusters");  
-
-  std::vector<int> used_ids;
-  for(int i= 0; i< clusters.size(); i++)
-  {
-    if(clusters.at(i).cluster_element.size() > 0)
-    {
-      nav_msgs::GridCells cluster_cells;
-      geometry_msgs::Point point;
-      for(int j= 0; j < clusters.at(i).cluster_element.size(); j++)
-      {
-        point.x = clusters.at(i).cluster_element.at(j).x_coordinate;
-        point.y = clusters.at(i).cluster_element.at(j).y_coordinate;
-        point.z = 0;
-
-        cluster_cells.cells.push_back(point);
-      }     
-      cluster_cells.header.frame_id = move_base_frame;    
-      cluster_cells.header.stamp = ros::Time::now();
-      cluster_cells.cell_height = 0.5;
-      cluster_cells.cell_width = 0.5;
-      cluster_cells.header.seq = cluster_cells_seq_number++;
-
-      used_ids.push_back(clusters.at(i).id % 20);
-
-      if(clusters.at(i).id % 20 == 0)
-      {
-        pub_cluster_grid_0.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 1)
-      {
-        pub_cluster_grid_1.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 2)
-      {
-        pub_cluster_grid_2.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 3)
-      {
-        pub_cluster_grid_3.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 4)
-      {
-        pub_cluster_grid_4.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 5)
-      {
-        pub_cluster_grid_5.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 6)
-      {
-        pub_cluster_grid_6.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 7)
-      {
-        pub_cluster_grid_7.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 8)
-      {
-        pub_cluster_grid_8.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 9)
-      {
-        pub_cluster_grid_9.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-
-      if(clusters.at(i).id % 20 == 10)
-      {
-        pub_cluster_grid_10.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 11)
-      {
-        pub_cluster_grid_11.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 12)
-      {
-        pub_cluster_grid_12.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 13)
-      {
-        pub_cluster_grid_13.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 14)
-      {
-        pub_cluster_grid_14.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 15)
-      {
-        pub_cluster_grid_15.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 16)
-      {
-        pub_cluster_grid_16.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 17)
-      {
-        pub_cluster_grid_17.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 18)
-      {
-        pub_cluster_grid_18.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-      else if(clusters.at(i).id % 20 == 19)
-      {
-        pub_cluster_grid_19.publish<nav_msgs::GridCells>(cluster_cells); 
-      }
-    }
-  }
-  clear_Visualized_Cluster_Cells(used_ids);
-}
-
 
 void ExplorationPlanner::visualize_Clusters()
 {

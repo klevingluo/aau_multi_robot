@@ -26,13 +26,11 @@ MapMerger::MapMerger() {
   transforms = new std::vector<cv::Mat>();
   new_data_maps = new std::vector<bool>();
   robots_in_transform = new std::vector<std::string>();
-  robots_position_publisher = new std::vector<ros::Publisher>();
   local_map = new nav_msgs::OccupancyGrid();
   local_map_old = new nav_msgs::OccupancyGrid();
   update_list = new std::vector<UpdateEntry*>();
   //get the ros parameters, or set them to their default value
   //for testing here in codes
-  laser_range = 10;
   force_recompute_all = false;
   local_map_new_data = false;
   global_map_ready = true;

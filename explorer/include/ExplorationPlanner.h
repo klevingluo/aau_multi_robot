@@ -190,7 +190,6 @@ namespace explorationPlanner
             int next_auction_position_x, next_auction_position_y;
             
             ExplorationPlanner(int robot_id, bool robot_prefix_empty, std::string robot_name_parameter);
-            void printFrontiers();
             bool respondToAuction(std::vector<requested_cluster_t> requested_cluster_ids, int auction_id_number);
             bool clusterIdToElementIds(int cluster_id, std::vector<transform_point_t>* occupied_ids);
             bool initialize_auctioning(std::vector<double> *final_goal);
@@ -224,8 +223,6 @@ namespace explorationPlanner
             bool storeVisitedFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
             bool storeUnreachableFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
             bool removeStoredFrontier(int id, std::string detected_by_robot_str);
-            bool removeVisitedFrontier(int id, std::string detected_by_robot_str);
-            bool removeUnreachableFrontier(int id, std::string detected_by_robot_str);
             bool publish_frontier_list();
             bool publish_visited_frontier_list();
             bool publish_negotiation_list(frontier_t negotiation_frontier, int cluster);
@@ -244,7 +241,6 @@ namespace explorationPlanner
             bool negotiate_Frontier(double x, double y, int detected_by, int id, int cluster);
             bool clusterFrontiers();
             void visualize_Clusters();
-            void visualize_Cluster_Cells();
             
             bool transformToOwnCoordinates_frontiers();
             bool transformToOwnCoordinates_visited_frontiers();
