@@ -133,15 +133,6 @@ void MapMerger::waitForRobotInformation() {
           ROS_WARN("Got my own name as a neigbor!");
           continue;
         }
-        else
-        {
-          if(has_local_map == false)
-          {
-            robot_name = newRobotName;
-            ROS_INFO("now using %s as name",robot_name.c_str());
-            return;
-          }
-        }
       }
     }
     else
@@ -706,43 +697,43 @@ void MapMerger::callback_map_other(const adhoc_communication::MmMapUpdateConstPt
   if(index_robots == -1) {
     ROS_WARN("Got map with a not valid frame_id:%s| index_robot == -1| size of data:%lu",toInsert->header.frame_id.c_str(),toInsert->data.size());
     return;
-  } else {
-    if(new_data_maps->size() < index_robots)
-      return;
-    new_data_maps->at(index_robots) = true;
-    ROS_DEBUG("GOT NOT LOCAL MAP,Process it, data size:%lu",toInsert->data.size());
+  }
 
-    if(map_data->size() < index_robots+1) {
-      ROS_ERROR("No map_data for robot_index:%i",index_robots);
-      return;
-    }
+  if(new_data_maps->size() < index_robots)
+    return;
+  new_data_maps->at(index_robots) = true;
+  ROS_DEBUG("GOT NOT LOCAL MAP,Process it, data size:%lu",toInsert->data.size());
 
-    updateMapArea(index_robots,toInsert);
-    ROS_DEBUG("Adding new list entry");
-    updateMan->addToupdateList(index_robots,msg.get()->update_numbers);
-    if(updateMan->isUpdatesMissing(index_robots))
-    {
-      ROS_DEBUG("Missed some updates for %s",robots->at(index_robots).c_str());
-      std::vector<int>* listOfMissedUpdates = updateMan->getMissingUpdateOfRobot(index_robots);
-      if(listOfMissedUpdates->size() == 0)
-      {
-        ROS_WARN("Something is Wrong with the missing updates");
-        delete listOfMissedUpdates;
-        return;
-      }
-      ROS_DEBUG("%lu updates are missing,asking for them",listOfMissedUpdates->size());
-      for(int i = 0; i < listOfMissedUpdates->size(); i++)
-      {
-        ROS_WARN("Miss: %i",listOfMissedUpdates->at(i));
-      }
-      sendControlMessage(listOfMissedUpdates,robots->at(index_robots));
-      delete listOfMissedUpdates;
-    }
-
-    ROS_INFO("starting compute transform for %i", index_robots);
-    recomputeTransform(index_robots);
+  if(map_data->size() < index_robots+1) {
+    ROS_ERROR("No map_data for robot_index:%i",index_robots);
     return;
   }
+
+  updateMapArea(index_robots,toInsert);
+  ROS_DEBUG("Adding new list entry");
+  updateMan->addToupdateList(index_robots,msg.get()->update_numbers);
+  if(updateMan->isUpdatesMissing(index_robots))
+  {
+    ROS_DEBUG("Missed some updates for %s",robots->at(index_robots).c_str());
+    std::vector<int>* listOfMissedUpdates = updateMan->getMissingUpdateOfRobot(index_robots);
+    if(listOfMissedUpdates->size() == 0)
+    {
+      ROS_WARN("Something is Wrong with the missing updates");
+      delete listOfMissedUpdates;
+      return;
+    }
+    ROS_DEBUG("%lu updates are missing,asking for them",listOfMissedUpdates->size());
+    for(int i = 0; i < listOfMissedUpdates->size(); i++)
+    {
+      ROS_WARN("Miss: %i",listOfMissedUpdates->at(i));
+    }
+    sendControlMessage(listOfMissedUpdates,robots->at(index_robots));
+    delete listOfMissedUpdates;
+  }
+
+  ROS_INFO("starting compute transform for %i", index_robots);
+  recomputeTransform(index_robots);
+  return;
 }
 
 // adds a local map to the merged map
@@ -851,10 +842,10 @@ void MapMerger::start()
       &MapMerger::callback_got_position_network,
       this);
 
-    send_position = nodeHandle->createTimer(
-        ros::Duration(seconds_send_position),
-        &MapMerger::callback_send_position,
-        this);
+  send_position = nodeHandle->createTimer(
+      ros::Duration(seconds_send_position),
+      &MapMerger::callback_send_position,
+      this);
 
   list_of_positions_publisher = nodeHandle->advertise<adhoc_communication::MmListOfPoints>(robot_prefix+"/"+"all_positions",3);
 
@@ -897,7 +888,11 @@ void MapMerger::start()
   ros::AsyncSpinner spinner(10);
   spinner.start();
   ros::Duration(1).sleep();
-  ask_other_timer = nodeHandle->createTimer(ros::Duration(5),&MapMerger::callback_ask_other_robots,this);
+
+  ask_other_timer = nodeHandle->createTimer(
+      ros::Duration(10),
+      &MapMerger::callback_ask_other_robots,
+      this);
 
   ros::waitForShutdown();
 }
@@ -1213,21 +1208,6 @@ void MapMerger::makeEmptyMapData(string robot_name,int height,int width,float re
     pos_seq_other->push_back(0);
     pos_array_other->push_back(visualization_msgs::MarkerArray());
     pos_pub_other->push_back(nodeHandle->advertise<visualization_msgs::MarkerArray>("position_"+robot_name,3));
-  }
-}
-
-void MapMerger::callback_robot_status(const nav_msgs::MapMetaData::ConstPtr &msg) {
-  for(int i = 0; i < robots->size(); i++) {
-
-    /*if(robots->at(i) == robot_name)
-      {
-      ROS_INFO("Robot known");
-      }
-      else
-      {
-      ROS_INFO("New Robot:%s",robot_name.c_str());
-      robots->push_back(robot_name);
-      }*/
   }
 }
 
@@ -1616,55 +1596,37 @@ void MapMerger::callback_ask_other_robots(const ros::TimerEvent &e) {
     (robot_prefix+"/adhoc_communication/get_neighbors");
   adhoc_communication::GetNeighbors getNeighbors;
 
-  if(!has_local_map) {
-    std::vector<int>* empty = new std::vector<int>();
-    sendControlMessage(empty,robot_name);
-    delete empty;
+  if(!getNeighborsClient.call(getNeighbors)) {
+    ROS_WARN("Can't call service to get neighbors");
+    return;
   }
 
-  if(getNeighborsClient.call(getNeighbors)) {
+  if(getNeighbors.response.neigbors.size() <= 0) {
+    ROS_INFO("No robots are were in the network before me");
+    return;
+  }
 
-    ROS_INFO(
-        "%lu robots are already in the network, adding them, my name:%s",
-        getNeighbors.response.neigbors.size(), 
-        robot_name.c_str());
+  ROS_INFO(
+      "%lu robots are already in the network, adding them, my name:%s",
+      getNeighbors.response.neigbors.size(), 
+      robot_name.c_str());
 
-    if(getNeighbors.response.neigbors.size() > 0) {
-      for(int i = 0; i < getNeighbors.response.neigbors.size();i++) {
-        std::string newRobotName = getNeighbors.response.neigbors.at(i);
-        if(newRobotName == robot_name) {
-          ROS_WARN("Got my own name as a neigbor!");
-          continue;
-        }
-        bool cont = false;
-        for(int h = 0; h < robots->size(); h++) {
-          if(newRobotName == robots->at(h))
-            cont = true;
-        }
-        // I think getting rid of this will cause more map updates
-        if(cont)
-          continue;
-        robots->push_back(newRobotName);
-        ROS_INFO("New robot:%s",newRobotName.c_str());
-        updateMan->addNewUpdateList();
-        makeEmptyMapData(newRobotName,map_height,map_width,local_map->info.resolution);
-        ROS_INFO("asking %s for map",newRobotName.c_str());
+  for(int i = 0; i < getNeighbors.response.neigbors.size();i++) {
+    std::string newRobotName = getNeighbors.response.neigbors.at(i);
+    if(newRobotName == robot_name) {
+      ROS_WARN("Got my own name as a neigbor!");
+      continue;
+    }
+    bool cont = false;
+    for(int h = 0; h < robots->size(); h++) {
+      if(newRobotName == robots->at(h))
+      {
+        cont = true;
         std::vector<int>* empty = new std::vector<int>();
-        std::vector<int>* neg = new std::vector<int>();
-        neg->push_back(-1);
-
-        ros::Duration(1).sleep();
-        // is this requesting the map? kevin seems only for new robots then
         sendControlMessage(empty,newRobotName);
         delete empty;
-        delete neg;
+        break;
       }
-    } else {
-      ROS_INFO("No robots are were in the network before me");
     }
   }
-  else {
-    ROS_WARN("Can't call service to get neighbors");
-  }
-  ask_other_timer.stop();
 }

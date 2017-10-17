@@ -64,7 +64,6 @@ private:
     void callback_map_other(const adhoc_communication::MmMapUpdateConstPtr &msg);
     void callback_control(const adhoc_communication::MmControlConstPtr &msg);
     void callback_map_meta_data_local(const nav_msgs::OccupancyGrid::ConstPtr &msg);
-    void callback_robot_status(const nav_msgs::MapMetaData::ConstPtr &msg);
     void callback_global_pub(const ros::TimerEvent &e);
     void callback_send_map(const ros::TimerEvent &e);
     void callback_send_position(const ros::TimerEvent &e);

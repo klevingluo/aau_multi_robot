@@ -53,7 +53,8 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
 
   // 3. match keypoints
   // seems to need 450 kpv for a good match - kevin
-  if(kpv1.size() < 450 || kpv2.size() < 450 ) {
+  // actually this seems not needed, will investigate further
+  if(kpv1.size() < 50 || kpv2.size() < 50 ) {
       ROS_WARN("Not enough KPV");
       works = false;
       return;
