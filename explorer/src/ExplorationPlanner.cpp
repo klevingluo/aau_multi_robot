@@ -361,6 +361,16 @@ bool ExplorationPlanner::clusterFrontiers() {
  * outputs clusters to the rviz console
  */
 void ExplorationPlanner::visualizeClustersConsole() {
+
+  // action 3: delete all markers
+  visualization_msgs::Marker deleteall;
+  deleteall.action = 3;
+
+  visualization_msgs::MarkerArray deleteallArray;
+  deleteallArray.markers.push_back(deleteall);              
+
+  pub_clusters.publish <visualization_msgs::MarkerArray>(deleteallArray);
+
   visualization_msgs::MarkerArray clustersArray;
   for(int j = 0; j < clusters.size(); j++) {
 
@@ -376,7 +386,7 @@ void ExplorationPlanner::visualizeClustersConsole() {
       marker.header.seq = frontier_seq_number++;
       marker.ns = "clusters";
       marker.id = frontier_seq_number;
-      marker.type = visualization_msgs::Marker::SPHERE;
+      marker.type = visualization_msgs::Marker::CUBE;
       marker.action = visualization_msgs::Marker::ADD;
       marker.pose.position.x = clusters.at(j).cluster_element.at(n).x_coordinate;
       marker.pose.position.y = clusters.at(j).cluster_element.at(n).y_coordinate;
@@ -2998,44 +3008,6 @@ bool ExplorationPlanner::selectClusterBasedOnAuction(std::vector<double> *goal, 
     }
     std::cout << std::endl;
 
-
-
-    //        for(int i = 0; i < mat.columns(); i++)
-    //        {
-    //            for(int j = 0; j < mat.rows(); j++)
-    //            {
-    //                /*Inner Matrix*/
-    ////                bool element_found = false; 
-    //                for(int n = 0; n < mat.columns(); n++)
-    //                {
-    //                    for(int m = 0; m < mat.rows(); m++)
-    //                    {
-    //                        if(abs(mat(i,j) - mat(n,m)) <= 20 && abs(mat(i,j) - mat(n,m)) != 0 && (mat(i,j) != 0 && mat(n,m) != 0))
-    //                        {       
-    //                            mat(i,j) = 0;
-    ////                            element_found = true;
-    ////                            break;
-    //                        }
-    //                    }
-    ////                    if(element_found = true)
-    ////                        break;
-    //                } 
-    //            }
-    //        }
-    //        
-    //        ROS_INFO("Matrix with threshold :");
-    //        // Display begin matrix state.
-    //	for ( int new_row = 0 ; new_row < mat.rows(); new_row++ ) {
-    //		for ( int new_col = 0 ; new_col < mat.columns(); new_col++ ) {
-    //			std::cout.width(2);
-    //			std::cout << mat(new_row,new_col) << " ";
-    //		}
-    //		std::cout << std::endl;
-    //	}
-    //	std::cout << std::endl;
-
-
-    // Apply Munkres algorithm to matrix.
     Munkres munk;
     munk.solve(mat);
 
@@ -4184,13 +4156,6 @@ void ExplorationPlanner::setupMapData() {
 
     ROS_INFO("Costmap size in cells: width:%d   height: %d   map_cells:%d",map_width_,map_height_,num_map_cells_);
 
-    // initialize exploration_trans_array_, obstacle_trans_array_, goalMap and frontier_map_array_
-    //		exploration_trans_array_ = new unsigned int[num_map_cells_];
-    //		obstacle_trans_array_ = new unsigned int[num_map_cells_];
-    //		is_goal_array_ = new bool[num_map_cells_];
-    //		frontier_map_array_ = new int[num_map_cells_];
-    //		clearFrontiers();
-    //		resetMaps();
   }
 
 
@@ -4200,13 +4165,6 @@ void ExplorationPlanner::setupMapData() {
 
     countCostMapBlocks(i);
 
-    //	  if(occupancy_grid_array_[i] == costmap_2d::NO_INFORMATION || occupancy_grid_array_[i] == costmap_2d::INSCRIBED_INFLATED_OBSTACLE || occupancy_grid_array_[i] == costmap_2d::LETHAL_OBSTACLE || occupancy_grid_array_[i] == costmap_2d::FREE_SPACE)
-    //	  {
-    //	  }else
-    //	  {
-    //		  ROS_DEBUG("%d",(int)occupancy_grid_array_[i]);
-    //		  //occupancy_grid_array_[i] = '0'; // write 0 to the grid!
-    //	  }
   }
   ROS_INFO("--------------------- Iterate through Costmap --------------------");
   ROS_INFO("Free: %d  Inflated: %d  Lethal: %d  unknown: %d rest: %d", free,

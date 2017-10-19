@@ -112,6 +112,10 @@ private:
     std::vector<UpdateEntry>* formerUpdates;
     ros::Publisher  list_of_positions_publisher;
     //std::vector<adhoc_communication::
+
+    // publishes the other map from the other robot.
+    ros::Publisher other_map_publisher;
+
     adhoc_communication::MmListOfPoints * positions;
     int map_width,map_height,size,
         seconds_meta_timer,seconds_publish_timer,

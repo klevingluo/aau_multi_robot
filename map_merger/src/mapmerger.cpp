@@ -680,10 +680,10 @@ void MapMerger::callback_got_position(const nav_msgs::Odometry::ConstPtr &msg)
 /// called on getting a map from another robot
 void MapMerger::callback_map_other(const adhoc_communication::MmMapUpdateConstPtr &msg) {
   nav_msgs::OccupancyGrid tmp =  msg.get()->map;
+
   nav_msgs::OccupancyGrid * toInsert = &tmp;
   int index_robots = -1;
   ROS_INFO("Got map from %s",msg.get()->src_robot.c_str());
-  std::string src_robot = msg.get()->src_robot;
 
   // find the robot that this corresponds to
   for(int i = 0; i < robots->size();i++) {
@@ -692,6 +692,9 @@ void MapMerger::callback_map_other(const adhoc_communication::MmMapUpdateConstPt
       break;
     }
   }
+
+  map_data->at(index_robots)->header.frame_id="hype_world";
+  other_map_publisher.publish(*map_data->at(index_robots));
 
   // the robot was not found
   if(index_robots == -1) {
@@ -702,7 +705,6 @@ void MapMerger::callback_map_other(const adhoc_communication::MmMapUpdateConstPt
   if(new_data_maps->size() < index_robots)
     return;
   new_data_maps->at(index_robots) = true;
-  ROS_DEBUG("GOT NOT LOCAL MAP,Process it, data size:%lu",toInsert->data.size());
 
   if(map_data->size() < index_robots+1) {
     ROS_ERROR("No map_data for robot_index:%i",index_robots);
@@ -847,7 +849,15 @@ void MapMerger::start()
       &MapMerger::callback_send_position,
       this);
 
-  list_of_positions_publisher = nodeHandle->advertise<adhoc_communication::MmListOfPoints>(robot_prefix+"/"+"all_positions",3);
+  list_of_positions_publisher = 
+    nodeHandle->advertise<adhoc_communication::MmListOfPoints>(
+        robot_prefix+"/"+"all_positions",
+        3);
+
+  other_map_publisher = 
+    nodeHandle->advertise<nav_msgs::OccupancyGrid>(
+        "other_robot_map",
+        3);
 
   ROS_INFO("Init Subscriber");
   pub = nodeHandle->advertise<nav_msgs::OccupancyGrid>("global_map",3);
@@ -1562,7 +1572,7 @@ void MapMerger::sendBackAskedMapData(string robotName, std::vector<int> missingU
 }
 
 /**
- * sends a control message to a robot
+ * sends a control message to a robot, asking for a map
  *
  * @param updateNumbers:
  * @param dest

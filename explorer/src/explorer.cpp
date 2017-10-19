@@ -212,9 +212,6 @@ class Explorer {
         exploration->publish_frontier_list();  
         exploration->publish_visited_frontier_list();  
 
-        /*
-         * Sleep to ensure that frontiers are exchanged
-         */
         ros::Duration(1).sleep();
 
         //FRONTIER SELECTION

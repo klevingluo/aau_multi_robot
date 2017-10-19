@@ -100,10 +100,8 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
     }
   }
 
-   // cv::imwrite("img1.pgm",image1);
-   // cv::imwrite("img2.pgm",image2);
-  // 5. find homography
- // ROS_INFO("Found %i matches",matches.size());
+  // cv::imwrite("img1.pgm",image1);
+  // ROS_INFO("Found %i matches",matches.size());
   if(coord1.size() < 1) {
       ROS_WARN("Not enough matching points found, map likely not big enough \n Coord1:%lu",coord1.size());
       works = false;
