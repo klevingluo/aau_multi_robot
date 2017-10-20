@@ -159,7 +159,6 @@ namespace explorationPlanner
             
             std::string trajectory_strategy;
             bool first_run, first_negotiation_run;
-            bool start_thr_auction;
 
             int number_of_auction_runs;
             int cluster_id, cluster_cells_seq_number;
@@ -196,7 +195,7 @@ namespace explorationPlanner
             bool auctioning(std::vector<double> *final_goal, std::vector<int> *clusters_available_in_pool, std::vector<std::string> *robot_str_name);
             bool selectClusterBasedOnAuction(std::vector<double> *goal, std::vector<int> *cluster_in_use_already_count, std::vector<std::string> *robot_str_name_to_return);
             bool InitSelectClusterBasedOnAuction(std::vector<double> *goal);
-            int calculateAuctionBID(int cluster_number, std::string strategy);
+            int calculateAuctionBID(int cluster_number, std::string strategy, int robot_x, int robot_y);
             std::string lookupRobotName(int robot_name_int);
 //            void auctionStatusCallback(const adhoc_communication::AuctionStatus::ConstPtr& msg);
 //            void controlCallback(const bla& msg);
@@ -211,7 +210,6 @@ namespace explorationPlanner
             void visualize_Frontiers();
             void visualize_visited_Frontiers();
             void visualizeClustersConsole();
-            void clear_Visualized_Cluster_Cells(std::vector<int> ids);
             void initialize_planner(std::string name, costmap_2d::Costmap2DROS *costmap, costmap_2d::Costmap2DROS *costmap_global);
             void findFrontiers();
             bool check_efficiency_of_goal(double x, double y);
@@ -240,7 +238,6 @@ namespace explorationPlanner
             int check_trajectory_plan(double x, double y);
             bool negotiate_Frontier(double x, double y, int detected_by, int id, int cluster);
             bool clusterFrontiers();
-            void visualize_Clusters();
             
             bool transformToOwnCoordinates_frontiers();
             bool transformToOwnCoordinates_visited_frontiers();

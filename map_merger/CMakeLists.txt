@@ -86,7 +86,7 @@ CATKIN_DEPENDS message_runtime adhoc_communication nav_msgs roscpp
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
-${catkin_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
 )
 ## Declare a cpp library
 # add_library(map_merger
