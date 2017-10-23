@@ -106,8 +106,8 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
     strm << std::time(NULL);
     string timestamp = strm.str();
 
-    cv::imwrite("~/.ros/mapmerges/" + timestamp + "img1.pgm",image1);
-    cv::imwrite("~/.ros/mapmerges/" + timestamp + "img2.pgm",image2);
+    cv::imwrite("mapmerges/" + timestamp + "img1.pgm",image1);
+    cv::imwrite("mapmerges/" + timestamp + "img2.pgm",image2);
     ROS_WARN("saving image as test image");
   }
 
