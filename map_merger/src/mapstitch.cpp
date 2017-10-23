@@ -24,9 +24,10 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #include "mapstitch.h"
 #include "math.h"
-#include <opencv2/opencv.hpp>
-#include <opencv2/highgui/highgui.hpp>
+#include <ctime>
 #include <opencv2/features2d/features2d.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/opencv.hpp>
 
 StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, float max_pairwise_distance, cv::Mat oldTransform) {
 
@@ -100,8 +101,16 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
     }
   }
 
-  // cv::imwrite("img1.pgm",image1);
-  // ROS_INFO("Found %i matches",matches.size());
+  if ((double)rand() / RAND_MAX < 0.05) {
+    std::stringstream strm;
+    strm << std::time(NULL);
+    string timestamp = strm.str();
+
+    cv::imwrite("mapmerges/" + timestamp + "img1.pgm",image1);
+    cv::imwrite("mapmerges/" + timestamp + "img2.pgm",image2);
+    ROS_WARN("saving image as test image");
+  }
+
   if(coord1.size() < 1) {
       ROS_WARN("Not enough matching points found, map likely not big enough \n Coord1:%lu",coord1.size());
       works = false;
