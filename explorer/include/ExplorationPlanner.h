@@ -104,7 +104,8 @@ namespace explorationPlanner
             ros::Publisher pub_auctioning_first; 
             ros::Subscriber sub_auctioning_first; 
             
-            ros::Publisher pub_clusters;
+            ros::Publisher pub_clusters, pub_cluster_grid_0, pub_cluster_grid_1, pub_cluster_grid_2, pub_cluster_grid_3, pub_cluster_grid_4, pub_cluster_grid_5, pub_cluster_grid_6, pub_cluster_grid_7, pub_cluster_grid_8, pub_cluster_grid_9,
+            pub_cluster_grid_10,pub_cluster_grid_11,pub_cluster_grid_12,pub_cluster_grid_13,pub_cluster_grid_14,pub_cluster_grid_15,pub_cluster_grid_16,pub_cluster_grid_17,pub_cluster_grid_18,pub_cluster_grid_19;
             
             ros::NodeHandle nh_frontier, nh_visited_frontier;
             ros::NodeHandle nh_Point, nh_visited_Point, nh_frontiers_points;
@@ -238,7 +239,6 @@ namespace explorationPlanner
             bool negotiate_Frontier(double x, double y, int detected_by, int id, int cluster);
             bool clusterFrontiers();
             
-            bool transformToOwnCoordinates(int x, int y, int detected_by_robot, int &newx, int &newy);
             bool transformToOwnCoordinates_frontiers();
             bool transformToOwnCoordinates_visited_frontiers();
 
@@ -256,19 +256,30 @@ namespace explorationPlanner
             bool isFree(int point);
             inline bool isValid(int point);
             inline void getAdjacentPoints(int point, int points[]);
+            std::vector<int> getMapNeighbours(unsigned int point_x, unsigned int point_y, int distance);
             bool isFrontierReached(int point);
             int backoff (int point);
+            double getYawToUnknown(int point);
             bool isSameFrontier(int frontier_point1, int frontier_point2);
             void setupMapData();
             void deleteMapData();
             void resetMaps();
             bool countCostMapBlocks(int point);
 
+            int left(int point);
+            int upleft(int point);
+            int up(int point);
+            int upright(int point);
+            int right(int point);
+            int downright(int point);
+            int down(int point);
+            int downleft(int point);
+
             enum LastMode
             {
-              FRONTIER_EXPLORE,
-              INNER_EXPLORE
-            } last_mode_;
+                FRONTIER_EXPLORE,
+                INNER_EXPLORE
+              } last_mode_;
 
             costmap_2d::Costmap2DROS *costmap_ros_;
             costmap_2d::Costmap2DROS *costmap_global_ros_;
