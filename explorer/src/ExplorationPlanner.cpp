@@ -1,33 +1,34 @@
 #include "ExplorationPlanner.h"
-#include "ros/ros.h"
+#include "boost_matrix.h"
 #include "hungarian.h"
 #include "munkres.h"
-#include "boost_matrix.h"
-#include <ros/console.h>
-#include <costmap_2d/costmap_2d_ros.h>
-#include <costmap_2d/costmap_2d.h>
-#include <navfn/navfn_ros.h>
-#include <visualization_msgs/Marker.h>
-#include <visualization_msgs/MarkerArray.h>
-#include <dynamic_reconfigure/server.h>
-#include <string.h>
-#include <stdlib.h>
-#include <geometry_msgs/PolygonStamped.h>
-#include <nav_msgs/GridCells.h>
+#include "ros/ros.h"
+#include <adhoc_communication/ExpAuction.h>
 #include <adhoc_communication/ExpCluster.h>
 #include <adhoc_communication/ExpClusterElement.h>
-#include <adhoc_communication/ExpAuction.h>
 #include <adhoc_communication/ExpFrontier.h>
 #include <adhoc_communication/ExpFrontierElement.h>
-#include <adhoc_communication/SendExpFrontier.h>
+#include <adhoc_communication/MmListOfPoints.h>
 #include <adhoc_communication/SendExpAuction.h>
 #include <adhoc_communication/SendExpCluster.h>
-#include <boost/numeric/ublas/matrix.hpp>
-#include <boost/numeric/ublas/io.hpp>
-#include <adhoc_communication/MmListOfPoints.h>
-#include <map_merger/TransformPoint.h>
+#include <adhoc_communication/SendExpFrontier.h>
 #include <base_local_planner/trajectory_planner_ros.h>
+#include <boost/numeric/ublas/io.hpp>
+#include <boost/numeric/ublas/matrix.hpp>
+#include <costmap_2d/costmap_2d.h>
+#include <costmap_2d/costmap_2d_ros.h>
+#include <dynamic_reconfigure/server.h>
+#include <geometry_msgs/PolygonStamped.h>
+#include <map_merger/TransformPoint.h>
 #include <math.h>
+#include <nav_msgs/GridCells.h>
+#include <navfn/navfn_ros.h>
+#include <ros/console.h>
+#include <stdlib.h>
+#include <string.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+#include <boost/graph/grid_graph.hpp >
 
 #define MAX_DISTANCE 2000			// max distance to starting point
 #define MAX_GOAL_RANGE 0.2			// min distance between frontiers (search)
@@ -1564,8 +1565,19 @@ void ExplorationPlanner::clearSeenFrontiers(costmap_2d::Costmap2DROS *global_cos
  */
 void ExplorationPlanner::findFrontiers() {
   // TODO:  fix this, it's a little inefficient, 2 hrs
-
   ROS_INFO("called find frontiers");
+
+  /** beginnings of BFS search for frontiers
+  if (!costmap_ros_->getRobotPose(robotPose)) {
+    ROS_WARN("could not get robot pose");
+  }
+
+  int robx = robotPose.getOrigin().getX();
+  int roby = robotPose.getOrigin().getY();
+
+  boost::array<int, 2> lengths = { { map_width_, map_height_ } };
+  boost::grid_graph<2> graph(lengths);
+  */
 
   allFrontiers.clear();
   int select_frontier = 1;
