@@ -28,7 +28,6 @@
 #include <string.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
-#include <boost/graph/grid_graph.hpp >
 
 #define MAX_DISTANCE 2000			// max distance to starting point
 #define MAX_GOAL_RANGE 0.2			// min distance between frontiers (search)
