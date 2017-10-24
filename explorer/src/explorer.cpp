@@ -144,6 +144,26 @@ class Explorer {
         // instantiate the planner
         exploration = new explorationPlanner::ExplorationPlanner(robot_id, robot_prefix_empty, robot_name);
 
+        ros::Subscriber localCostmapSub = nh.subscribe(
+            "/robot_1/move_base/local_costmap/costmap", 
+            1, 
+            &Explorer::localCostmapCallback,
+            this);
+
+        ros::Subscriber globalCostmapSub = nh.subscribe(
+            "/robot_1/move_base/global_costmap/costmap", 
+            1, 
+            &Explorer::globalCostmapCallback,
+            this);
+
+        while(ros::ok()) {
+          ros::spinOnce();
+          ROS_ERROR("No map_meta information");
+          ros::Duration(0.3).sleep();
+          if(exploration->initialized_planner)
+            break;
+        }
+
         /*
          * Define the first Goal. This is required to have at least one entry
          * within the vector. Therefore set it to the home position.
@@ -160,7 +180,6 @@ class Explorer {
         exploration->storeFrontier(robot_home_position_x,robot_home_position_y, robot_id, robot_name, -1);           
 
         exploration->setRobotConfig(robot_id, robot_home_position_x, robot_home_position_y, move_base_frame);
-
       }
 
     /**
@@ -190,8 +209,6 @@ class Explorer {
         exploration->transformToOwnCoordinates_frontiers();
         exploration->transformToOwnCoordinates_visited_frontiers();
 
-        exploration->initialize_planner("exploration planner", costmap2d_local, costmap2d_global);
-
         exploration->findFrontiers();
 
         // adds unvisited frontiers to a list, comparing them to a list of seen frontiers
@@ -199,7 +216,7 @@ class Explorer {
         // same, but with unreachable frontiers
         exploration->clearUnreachableFrontiers();
         // dunno probably just checks the costmap for the frontiers
-        exploration->clearSeenFrontiers(costmap2d_global);       
+        exploration->clearSeenFrontiers();       
 
         // this doesn't do anything, right?
         costmap_mutex.unlock();
@@ -585,13 +602,6 @@ class Explorer {
 
         } 
 
-
-        /*
-         * *****************************************************
-         * FRONTIER COORDINATION
-         * *****************************************************
-         */
-
         exploration->visualizeClustersConsole();
         exploration->visualize_Frontiers();
 
@@ -618,29 +628,6 @@ class Explorer {
       }
     }         
 
-    /**
-     * clear seen frontiers from the list, republish frontiers list
-     */
-    void frontiers()
-    {
-      ros::Rate r(5);
-      while(ros::ok())
-      {
-        costmap_mutex.lock();
-
-        exploration->clearSeenFrontiers(costmap2d_global);
-        exploration->clearVisitedFrontiers();
-        exploration->clearUnreachableFrontiers(); 
-
-        exploration->publish_frontier_list();  
-        exploration->publish_visited_frontier_list();  
-
-        costmap_mutex.unlock();
-
-        r.sleep();
-      }
-    }
-
     void initLogPath()
     {
       /*
@@ -649,6 +636,7 @@ class Explorer {
        * which is localized at the log_path
        */
 
+      ROS_INFO("debug initlogpath");
       nh.param<std::string>("log_path",log_path,"");           
 
       std::stringstream robot_number;
@@ -674,6 +662,7 @@ class Explorer {
 
     void save_progress(bool final=false)
     {
+      ROS_INFO("save_progres");
       ros::Duration ros_time = ros::Time::now() - time_start;
 
       double exploration_time = ros_time.toSec();           
@@ -763,9 +752,6 @@ class Explorer {
         fs << "complete             			= " << "0" << std::endl;
 
       fs.close();
-      //            ROS_INFO("Wrote file %s\n", log_file.c_str());                    
-
-
       /*
        * Inform map_merger to save maps
        */
@@ -782,6 +768,7 @@ class Explorer {
 
     void exploration_has_finished()
     {
+      ROS_INFO("finished?");
       ros::Duration ros_time = ros::Time::now() - time_start;
 
       double exploration_time = ros_time.toSec();           
@@ -831,16 +818,14 @@ class Explorer {
       exploration->transformToOwnCoordinates_frontiers();
       exploration->transformToOwnCoordinates_visited_frontiers();
 
-      exploration->initialize_planner("exploration planner", costmap2d_global, costmap2d_global);
       exploration->findFrontiers();
+      exploration->visualize_Frontiers();
 
       exploration->clearVisitedFrontiers();                       
       exploration->clearUnreachableFrontiers();
-      exploration->clearSeenFrontiers(costmap2d_global);       
+      exploration->clearSeenFrontiers();       
 
       costmap_mutex.unlock();
-
-      exploration->visualize_Frontiers();
 
       if(frontier_selection < 5 && frontier_selection != 1)
       {
@@ -879,8 +864,6 @@ class Explorer {
         exploration->sort(5);
 
         costmap_mutex.unlock(); 
-
-        //                    exploration->visualizeClustersConsole();
 
         cluster_element = -1;
 
@@ -943,6 +926,7 @@ class Explorer {
      * frontier.
      */
     bool navigate(std::vector<double> goal) {
+      ROS_INFO("nav");
       bool completed_navigation = false;
       if (goal_determined == true) {
         visualize_goal_point(goal.at(0), goal.at(1));
@@ -1024,6 +1008,7 @@ class Explorer {
     }
 
     void visualize_goal_point(double x, double y) {
+      ROS_INFO("nav");
 
       goalPoint.header.seq = goal_point_message++;
       goalPoint.header.stamp = ros::Time::now();
@@ -1041,6 +1026,7 @@ class Explorer {
     // returns true if the action succeeded, false on abort, 
     bool move_robot(int seq, double position_x, double position_y) {
 
+      ROS_INFO("nav");
       exploration->next_auction_position_x = position_x;
       exploration->next_auction_position_y = position_y;
 
@@ -1096,19 +1082,6 @@ class Explorer {
           exploration->next_auction_position_y = robotPose.getOrigin().getY();
           return false;
         }
-        /*
-           double my_time = ros::Time::now().toSec();
-        //ROS_ERROR("my_time: %f     timeout: %f",my_time,timeout);
-        if(my_time >= timeout)
-        {
-        ROS_ERROR("Timeout exceeded");
-        break;
-        }
-        if(ac.getState() == actionlib::SimpleClientGoalState::PREEMPTED){ROS_ERROR("PREEMPTED");}
-        if(ac.getState() == actionlib::SimpleClientGoalState::ABORTED){ROS_ERROR("ABORTED");}
-        if(ac.getState() == actionlib::SimpleClientGoalState::REJECTED){ROS_ERROR("REJECTED");}
-        if(ac.getState() == actionlib::SimpleClientGoalState::RECALLED){ROS_ERROR("RECALLED");}
-        */
       }
       ROS_INFO("TARGET REACHED");
 
@@ -1177,7 +1150,18 @@ class Explorer {
 
     }
 
+    void localCostmapCallback(nav_msgs::OccupancyGridPtr msg) {
+      nav_msgs::OccupancyGrid costmap = *msg.get();
+      exploration->updateLocalCostmap(&costmap);
+    }
+
+    void globalCostmapCallback(nav_msgs::OccupancyGridPtr msg) {
+      nav_msgs::OccupancyGrid costmap = *msg.get();
+      exploration->updateGlobalCostmap(&costmap);
+    }
+
     bool target_reached(void) {
+      ROS_INFO("nav");
 
       ros::NodeHandle nh_sub_move_base;
       sub_move_base = nh_sub_move_base.subscribe("feedback", 1000,
@@ -1267,16 +1251,14 @@ class Explorer {
 int main(int argc, char **argv) {
 
   ros::init(argc, argv, "simple_navigation");
-  /*
-   * Create instance of Simple Navigation
-   */
+
+  // Create instance of Simple Navigation
   tf::TransformListener tf(ros::Duration(10));
   Explorer simple(tf);
 
   boost::thread thr_explore(boost::bind(&Explorer::explore, &simple));	
 
   while (ros::ok()) {
-
     costmap_mutex.lock(); 
     ros::spinOnce();
     costmap_mutex.unlock();

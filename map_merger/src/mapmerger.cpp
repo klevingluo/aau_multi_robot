@@ -22,10 +22,10 @@ MapMerger::MapMerger() {
 
   // vector of all received maps
   map_data = new std::vector<nav_msgs::OccupancyGrid*>();
-
   // vector of robot names
   robots = new std::vector<std::string>();
   transforms = new std::vector<cv::Mat>();
+
   new_data_maps = new std::vector<bool>();
   robots_in_transform = new std::vector<std::string>();
   local_map = new nav_msgs::OccupancyGrid();
@@ -356,7 +356,6 @@ void MapMerger::callback_global_pub(const ros::TimerEvent &e) {
           map_data->size(),
           transforms->size());
       updateMap(map_to_merge,findTransformIndex(i));
-      mergeMaps(map_to_merge);
 
       delete map_to_merge;
     }
@@ -456,7 +455,6 @@ void MapMerger::callback_recompute_transform(const ros::TimerEvent &e) {
       map_to_merge->info = whole_map->info;
       map_to_merge->header = whole_map->header;
       updateMap(map_to_merge,findTransformIndex(i));
-      mergeMaps(map_to_merge);
       delete map_to_merge;
       new_data_maps->at(i) = false;
     }
@@ -574,8 +572,9 @@ void MapMerger::callback_got_position_network(const adhoc_communication::MmRobot
             return;
           }
           cv::Mat trans = transforms->at(index_transform);
-          cv::Point org_point(map_width / 2 +tmp.pose.position.x / 0.05,
-              map_height / 2 +tmp.pose.position.y / 0.05);
+          cv::Point org_point(
+              map_width / 2,
+              map_height / 2);
           cv::Point homogeneous;
           std::vector<cv::Point> inPts,outPts;
           inPts.push_back(org_point);
@@ -583,11 +582,10 @@ void MapMerger::callback_got_position_network(const adhoc_communication::MmRobot
           cv::Size s;
           s.height = map_height; //* 0.05;
           s.width = map_width ;//* 0.05;
-
           cv::transform(inPts,outPts,trans);
-
           newPosition.x = (outPts.at(0).x - map_width / 2) * 0.05;
           newPosition.y = (outPts.at(0).y - map_height / 2) * 0.05;
+
           positions->positions.at(j) = newPosition;
 
           ROS_DEBUG("Publish other position,j:%i",j);
@@ -634,33 +632,33 @@ void MapMerger::callback_got_position_network(const adhoc_communication::MmRobot
         ROS_DEBUG("find trans");
         int index_transform = findTransformIndex(i);
         ROS_DEBUG("finished find trans");
-        if(transforms->size() == 0 ) {
-          ROS_WARN("no transformation for %s, position is not published,index:%u, size:%lu",name.c_str(),index_transform,transforms->size());
-        }
         if( index_transform > transforms->size()) {
           return;
         }
-        ROS_DEBUG("get transform");
+        if(transforms->size() == 0 ) 
+        {
+          ROS_WARN("no transformation for %s, position is not published,index:%u, size:%lu",name.c_str(),index_transform,transforms->size());
+          return;
+        }
         if (transforms->at(index_transform).total() > 0) {
           ROS_ERROR("transform not yet computed");
           return;
         }
         cv::Mat trans = transforms->at(index_transform);
-        cv::Point org_point(map_width / 2 +tmp.pose.position.x / 0.05,
-            map_height / 2 +tmp.pose.position.y / 0.05);
+        cv::Point org_point(
+            map_width / 2,
+            map_height / 2);
         cv::Point homogeneous;
-        ROS_DEBUG("got transform");
         std::vector<cv::Point> inPts,outPts;
         inPts.push_back(org_point);
         outPts.push_back(homogeneous);
         cv::Size s;
         s.height = map_height; //* 0.05;
         s.width = map_width ;//* 0.05;
-
         cv::transform(inPts,outPts,trans);
-
         newPosition.x = (outPts.at(0).x - map_width / 2) * 0.05;
         newPosition.y = (outPts.at(0).y - map_height / 2) * 0.05;
+        
         positions->positions.push_back(newPosition);
       }
       //ROS_ERROR("Publisch List");
@@ -778,7 +776,6 @@ void MapMerger::processLocalMap(nav_msgs::OccupancyGrid * toInsert)
   }
   return;
 }
-
 
 // looks like it's sending its position to itself, wierd
 void MapMerger::processPosition(geometry_msgs::PoseStamped * pose) {
@@ -1007,13 +1004,16 @@ cv::Mat MapMerger::transformImage(Mat img1,Mat trans)
 {
   Mat image(img1.size(), img1.type());
   cv::Size s;
-  s.height = image.rows + 0;
-  s.width = image.cols + 0;
+  s.height = image.rows;
+  s.width = image.cols;
 
   warpAffine(img1,image,trans,s,INTER_NEAREST,BORDER_TRANSPARENT);
   return image;
 }
 
+/**
+ *
+ */
 void MapMerger::updateMap(nav_msgs::OccupancyGrid *mapToUpdate,int index_of_transform)
 {
   ROS_DEBUG("Start updateMap");
@@ -1027,13 +1027,19 @@ void MapMerger::updateMap(nav_msgs::OccupancyGrid *mapToUpdate,int index_of_tran
   ROS_DEBUG("Update:[%s]",mapToUpdate->header.frame_id.c_str());
   cv::Mat img = mapToMat(mapToUpdate);
   if (transforms->at(index_of_transform).total() > 0) {
-    ROS_ERROR("tranform not yet computed");
+    ROS_ERROR("transform not yet computed");
     return;
   }
+  cv::imwrite("before.pgm", img);
   img = transformImage(img,transforms->at(index_of_transform));
-  /*if(debug)
-    cv::imwrite("transed_img.pgm",img);*/
-  mapToUpdate =  matToMap(img,mapToUpdate);
+  cv::imwrite("after.pgm", img);
+
+  ros::Publisher transformed_map_pub = 
+  nodeHandle->advertise<nav_msgs::OccupancyGrid>(
+      robot_prefix+"/"+"transformed_map",
+      3);
+
+  mergeMaps(matToMap(img,mapToUpdate));
 }
 
 nav_msgs::OccupancyGrid* MapMerger::getMapPart(int map_index, int start_x, int start_y, int width, int height)
@@ -1156,7 +1162,6 @@ bool MapMerger::recomputeTransform(int mapDataIndex) {
     if(worked)
     {
       newTrans = mapStiched.H;
-      lastTrans = mapStiched.cur_trans;
     }
   }
   else
@@ -1173,26 +1178,12 @@ bool MapMerger::recomputeTransform(int mapDataIndex) {
     if(worked)
     {
       newTrans = mapStiched.H;
-      lastTrans = mapStiched.cur_trans;
     }
   }
   //calculates the transformation between the local map and all the other maps, and
   //then updates the map data.
   if(worked)
-  {
-    ROS_DEBUG("Storing new Transform for %s in array",map->header.frame_id.c_str());
-    if(findTransformIndex(mapDataIndex) == -1)
-    {
-      ROS_FATAL("Unknown robot transform calculated: %i",mapDataIndex);
-      transforms->push_back(newTrans);
-      robots_in_transform->push_back(robots->at(mapDataIndex));
-    }
-    else
-    {
-      ROS_DEBUG("Updating transform for robot:%i",mapDataIndex);
-      transforms->at(findTransformIndex(mapDataIndex)) = newTrans;
-    }
-  }
+    transforms->at(findTransformIndex(mapDataIndex)) = newTrans;
   return worked;
 }
 
@@ -1530,8 +1521,9 @@ bool MapMerger::transformPointSRV(map_merger::TransformPoint::Request &req, map_
     return false;
   }
   cv::Mat trans = transforms->at(index_transform);
-  cv::Point org_point(map_width / 2 +req.point.x / 0.05,
-      map_height / 2 +req.point.y / 0.05);
+  cv::Point org_point(
+      map_width / 2,
+      map_height / 2);
   cv::Point homogeneous;
   std::vector<cv::Point> inPts,outPts;
   inPts.push_back(org_point);

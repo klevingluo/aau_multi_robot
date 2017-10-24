@@ -133,7 +133,6 @@ private:
             force_recompute_all,
             global_map_ready;
 //            convergente;
-    cv::Mat lastTrans;
     ros::Publisher pub;
     geometry_msgs::PoseStamped * cur_position;
     float g_start_x,g_start_y;
