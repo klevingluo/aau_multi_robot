@@ -2845,41 +2845,6 @@ void ExplorationPlanner::sort(int strategy)
     std::sort(clusters.begin(), clusters.end(), sortCluster);
 
   }
-  else if(strategy == 6)
-  {
-    ROS_INFO("sort(6)");
-    tf::Stamped < tf::Pose > robotPose;
-    if (!costmap_ros_->getRobotPose(robotPose))
-    {
-      ROS_ERROR("Failed to get RobotPose");
-    }
-    double pose_x = robotPose.getOrigin().getX();
-    double pose_y = robotPose.getOrigin().getY();
-
-    ROS_DEBUG("Iterating over all cluster elements");
-
-    for(int i = 0; i < clusters.size(); i++)
-    {
-      if(clusters.at(i).cluster_element.size() > 0)
-      {
-        for(int j = 0; j < clusters.at(i).cluster_element.size(); j++)
-        {  
-          random_value = int(rand() % 100);
-          clusters.at(i).cluster_element.at(j).dist_to_robot = random_value;
-        }
-      }else
-      {
-        ROS_DEBUG("Erasing Cluster: %d", clusters.at(i).id);
-        clusters.erase(clusters.begin() + i);
-        if(i > 0)
-        {
-          i --;
-        }
-      }
-    }
-    ROS_DEBUG("Starting to sort the clusters itself");
-    std::sort(clusters.begin(), clusters.end(), sortCluster);  
-  }  
 
   ROS_INFO("Done sorting");
 }

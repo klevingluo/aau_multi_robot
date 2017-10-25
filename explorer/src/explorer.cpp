@@ -36,11 +36,9 @@ class Explorer {
       number_of_robots(1), 
       accessing_cluster(0), 
       cluster_element_size(0),
-      cluster_flag(false), 
       cluster_element(-1), 
       cluster_initialize_flag(false), 
       global_iterattions(0), 
-      global_iterations_counter(0), 
       counter_waiting_for_clusters(0), 
       global_costmap_iteration(0), 
       robot_prefix_empty(false), 
@@ -59,7 +57,6 @@ class Explorer {
 
         nh.param<std::string>("move_base_frame",move_base_frame,"map");  
         nh.param<int>("wait_for_planner_result",waitForResult,3);
-        // determine host name
         nh.param<std::string>("robot_prefix",robot_prefix,"");
 
         ROS_INFO("robot prefix: \"%s\"", robot_prefix.c_str());
@@ -111,7 +108,6 @@ class Explorer {
           ROS_INFO("Robot: %d", robot_id);
         } 
 
-
         /*
          *  CREATE LOG PATH
          * Following code enables to write the output to a file
@@ -121,19 +117,9 @@ class Explorer {
         csv_file = log_path + std::string("periodical.log");
         log_file = log_path + std::string("exploration.log"); 
 
-        ROS_DEBUG("Creating global costmap ...");
-        costmap2d_global = new costmap_2d::Costmap2DROS("global_costmap", tf);
-        ROS_DEBUG("Global costmap created ... now performing costmap -> pause");
-        costmap2d_global->pause();
-        ROS_DEBUG("Pausing performed");
-
-        costmap2d_local_size = new costmap_2d::Costmap2DROS("local_costmap", tf);
-        costmap2d_local_size->pause();
-        ROS_DEBUG("Starting Global costmap ...");
-        costmap2d_global->start();
-        costmap2d_local_size->start();
-
-        costmap2d_local = costmap2d_global;                   
+        costmap2d_local = new costmap_2d::Costmap2DROS("global_costmap", tf);
+        costmap2d_local->pause();
+        costmap2d_local->start();
 
         if (!costmap2d_local->getRobotPose(robotPose)) {
           ROS_ERROR("Failed to get RobotPose");
@@ -141,7 +127,6 @@ class Explorer {
         visualize_goal_point(robotPose.getOrigin().getX(),
             robotPose.getOrigin().getY());
 
-        // instantiate the planner
         exploration = new explorationPlanner::ExplorationPlanner(robot_id, robot_prefix_empty, robot_name);
 
         ros::Subscriber localCostmapSub = nh.subscribe(
@@ -199,52 +184,18 @@ class Explorer {
         bool negotiation;
         int count = 0;
 
-        /*
-         * Use mutex to lock the critical section 
-         * (access to the costmap)
-         * since rosspin tries to update the costmap continuously
-         */
-        costmap_mutex.lock();
-
-        exploration->transformToOwnCoordinates_frontiers();
-        exploration->transformToOwnCoordinates_visited_frontiers();
-
         exploration->findFrontiers();
-
-        // adds unvisited frontiers to a list, comparing them to a list of seen frontiers
-        exploration->clearVisitedFrontiers();                       
-        // same, but with unreachable frontiers
-        exploration->clearUnreachableFrontiers();
-        // dunno probably just checks the costmap for the frontiers
-        exploration->clearSeenFrontiers();       
-
-        // this doesn't do anything, right?
-        costmap_mutex.unlock();
-
-        // as in sends them out on multicast
-        exploration->publish_frontier_list();  
-        exploration->publish_visited_frontier_list();  
-
-        ros::Duration(1).sleep();
-        exploration->publish_frontier_list();  
-        exploration->publish_visited_frontier_list();  
-
-        ros::Duration(1).sleep();
-
-        //FRONTIER SELECTION
+        exploration->visualize_Frontiers();
+        exploration->clusterFrontiers();
+        exploration->visualizeClustersConsole();
 
         /*********** EXPLORATION STRATEGY ************
          * 0 ... Navigate to nearest frontier TRAVEL PATH
          * 1 ... Navigate using auctioning with cluster selection using 
          *       NEAREST selection (Kuhn-Munkres)
-         * 2 ... Navigate to furthest frontier
-         * 3 ... Navigate to nearest frontier EUCLIDEAN DISTANCE
-         * 4 ... Navigate to random Frontier
          * 5 ... Cluster frontiers, then navigate to nearest cluster 
          *       using EUCLIDEAN DISTANCE (with and without
          *       negotiation)
-         * 6 ... Cluster frontiers, then navigate to random cluster
-         *       (with and without negotiation)
          */
 
         /******************** SORT *******************
@@ -259,62 +210,6 @@ class Explorer {
         {
           ROS_FATAL("You selected an invalid exploration strategy. Please make sure to set it in the interval [0,6]. The current value is %d.", frontier_selection);
         }
-        if(frontier_selection == 2)
-        {
-
-          exploration->sort(1); 
-
-          /* 
-           * Choose which strategy to take.
-           * 1 ... least to first goal in list
-           * 2 ... first to last goal in list
-           *
-           * Determine_goal() takes world coordinates stored in
-           * the frontiers list(which contain every found frontier with sufficient
-           * spacing in between) and returns the most attractive one, based on the
-           * above defined strategies.
-           */    
-          while(true)
-          {   
-            if(goal_determined == false)
-            {
-              break;
-            }
-            else
-            {   
-              //negotiation = exploration->negotiate_Frontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),final_goal.at(3),-1);
-              negotiation = true; 
-              if(negotiation == true)
-              {
-                break;
-              }
-              count++;
-            }
-          }
-        }    
-        else if(frontier_selection == 3)
-        {                           
-          exploration->sort(2);
-
-          while(true)
-          {   
-            goal_determined = exploration->determine_goal(2, &final_goal, count, 0, &robot_str);
-            if(goal_determined == false)
-            {
-              break;
-            }
-            else
-            {
-              //negotiation = exploration->negotiate_Frontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),final_goal.at(3),-1);
-              negotiation = true; 
-              if(negotiation == true)
-              {
-                break;
-              }
-              count++;
-            }
-          }
-        }        
         else if(frontier_selection == 0)
         {
           exploration->sort(2);
@@ -329,35 +224,11 @@ class Explorer {
             }
             else
             {                        
-              //negotiation = exploration->negotiate_Frontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),final_goal.at(3),-1);
               negotiation = true;
               break;
               count++;
             }
           }
-        }
-        else if(frontier_selection == 4)
-        {
-          while(true)
-          {   
-            goal_determined = exploration->determine_goal(3, &final_goal, count, 0, &robot_str);
-            ROS_DEBUG("Goal_determined: %d   counter: %d",goal_determined, count);
-            if(goal_determined == false)
-            {
-              break;
-            }
-            else
-            {
-              //negotiation = exploration->negotiate_Frontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),final_goal.at(3),-1);
-              negotiation = true; 
-              if(negotiation == true)
-              {
-                break;
-              }
-              count++;
-            }
-          }
-
         }
         else if(frontier_selection == 5)
         {                            
@@ -378,9 +249,6 @@ class Explorer {
 
           exploration->clusterFrontiers();                 
           exploration->sort(4);      
-          exploration->sort(5);
-
-          //                            exploration->visualizeClustersConsole();
 
           clusters_available_in_pool.clear();
           while(true)
@@ -439,54 +307,6 @@ class Explorer {
             }
           }
         } 
-        else if(frontier_selection == 6)
-        {                            
-          if(cluster_initialize_flag == true)
-          {
-            exploration->clearVisitedAndSeenFrontiersFromClusters();
-          }
-
-          exploration->clusterFrontiers();   
-          exploration->sort(6);
-          exploration->visualizeClustersConsole();
-
-          if(cluster_initialize_flag == false)
-          {
-            ros::Duration(2).sleep();
-          }
-          cluster_initialize_flag = true;
-
-          while(true)
-          {             
-            goal_determined = exploration->determine_goal(4, &final_goal, count, cluster_element, &robot_str);
-
-            if(goal_determined == false)
-            {
-              break;
-            }
-            else
-            {   
-              /*
-               * If negotiation is not needed, simply uncomment
-               * and set the negotiation to TRUE.
-               */
-              negotiation = exploration->negotiate_Frontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),final_goal.at(3),final_goal.at(4));
-              //                                        negotiation = true; 
-
-              if(negotiation == true)
-              {
-                cluster_element = final_goal.at(4);
-                break;
-              }
-              else
-              {
-                cluster_element = int(exploration->clusters.size()*rand()/(RAND_MAX));
-                ROS_INFO("Random cluster_element: %d  from available %lu clusters", cluster_element, exploration->clusters.size());
-              }
-              count++;
-            }
-          }
-        } 
         else if(frontier_selection == 1)
         {     
           costmap_mutex.lock();
@@ -506,7 +326,6 @@ class Explorer {
 
           exploration->clusterFrontiers();                 
           exploration->sort(4);      
-          exploration->sort(5);
 
           costmap_mutex.unlock();
 
@@ -602,9 +421,6 @@ class Explorer {
 
         } 
 
-        exploration->visualizeClustersConsole();
-        exploration->visualize_Frontiers();
-
         if(goal_determined)
         {
           ROS_INFO("Doing navigation to goal");
@@ -614,15 +430,10 @@ class Explorer {
           if(navigation_successful)
           {
             exploration->calculate_travel_path(exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).x_coordinate, exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).y_coordinate);
-
-            ROS_DEBUG("Storing visited...");
-            exploration->storeVisitedFrontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),robot_str.at(0),final_goal.at(3)); 
-
           } else 
           {
             ROS_WARN("failed to navigate: Storing unreachable frontier with id:");
             exploration->storeUnreachableFrontier(final_goal.at(0),final_goal.at(1),final_goal.at(2),robot_str.at(0),final_goal.at(3)); 
-            ROS_DEBUG("Stored unreachable frontier");
           } 
         }
       }
@@ -813,19 +624,8 @@ class Explorer {
       int counter = 0;
       bool exploration_flag;
 
-      costmap_mutex.lock();
-
-      exploration->transformToOwnCoordinates_frontiers();
-      exploration->transformToOwnCoordinates_visited_frontiers();
-
       exploration->findFrontiers();
       exploration->visualize_Frontiers();
-
-      exploration->clearVisitedFrontiers();                       
-      exploration->clearUnreachableFrontiers();
-      exploration->clearSeenFrontiers();       
-
-      costmap_mutex.unlock();
 
       if(frontier_selection < 5 && frontier_selection != 1)
       {
@@ -834,7 +634,6 @@ class Explorer {
         while(true)
         {   
           exploration_flag = exploration->determine_goal(2, global_goal, counter, -1, robot_str);
-
 
           if(exploration_flag == false)
           {
@@ -861,7 +660,6 @@ class Explorer {
         exploration->clusterFrontiers(); 
 
         exploration->sort(4);      
-        exploration->sort(5);
 
         costmap_mutex.unlock(); 
 
@@ -926,84 +724,13 @@ class Explorer {
      * frontier.
      */
     bool navigate(std::vector<double> goal) {
-      ROS_INFO("nav");
       bool completed_navigation = false;
-      if (goal_determined == true) {
-        visualize_goal_point(goal.at(0), goal.at(1));
-        counter++;
-        ROS_INFO("GOAL %d:  x: %f      y: %f", counter, goal.at(0), goal.at(1));
-        completed_navigation = move_robot(counter, goal.at(0), goal.at(1));
-        if (!completed_navigation) {
-          ROS_WARN("navigation failed:");
-        }
-        rotation_counter = 0;
+      visualize_goal_point(goal.at(0), goal.at(1));
+      ROS_INFO("GOAL %d:  x: %f      y: %f", counter, goal.at(0), goal.at(1));
+      completed_navigation = move_robot(counter, goal.at(0), goal.at(1));
+      if (!completed_navigation) {
+        ROS_WARN("navigation failed:");
       }
-      else {
-        rotation_counter++;
-        ROS_INFO("In navigation .... cluster_available: %lu     counter: %d", exploration->clusters.size(), counter_waiting_for_clusters);			
-        // if(clusters_available_in_pool.size() <= 0 || counter_waiting_for_clusters > 10) //(rotation_counter >= 2)
-        if(exploration->clusters.size() == 0 || counter_waiting_for_clusters > 10) //(rotation_counter >= 2)
-        {
-          ROS_INFO("Iterating over GLOBAL COSTMAP to find a goal!!!!");
-          std::vector<double> global_goal;
-          std::vector<std::string> robot_str;
-          bool global_costmap_goal = iterate_global_costmap(&global_goal, &robot_str);
-
-          if(global_costmap_goal == false)
-          {
-            counter++;
-            ROS_INFO("GOAL %d: BACK TO HOME   x: %f    y: %f", counter, home_point_x, home_point_y);
-
-            /*
-             * If the robot should drive to the home position
-             * exploration_has_finished() has to be uncommented. 
-             * It creates a file which is the immediate trigger to 
-             * shut down the ros_node. Therefore the navigation process
-             * is canceled . 
-             */
-            exploration_has_finished();
-            visualize_goal_point(home_point_x, home_point_y);
-            completed_navigation = false;
-            for(int i = 0; i< 5; i++)
-            {
-              if(completed_navigation == false)
-              {
-                completed_navigation = move_robot(counter, home_point_x, home_point_y); 
-              }
-              else
-              {
-                break;
-              }                                       
-            }
-
-            exploration_finished = true;
-          }else
-          {
-            counter++;
-            ROS_INFO("GOAL %d:  x: %f      y: %f", counter, global_goal.at(0), global_goal.at(1));
-            visualize_goal_point(global_goal.at(0), global_goal.at(1));
-            completed_navigation = move_robot(counter, global_goal.at(0), global_goal.at(1));
-            rotation_counter = 0;
-            if(completed_navigation == true)
-            {
-              exploration->calculate_travel_path(exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).x_coordinate, exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).y_coordinate);
-
-              ROS_WARN("Storing visited...");
-              exploration->storeVisitedFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2),robot_str.at(0), global_goal.at(3)); 
-            }   
-            else
-            {
-              ROS_WARN("failed to navigate with: Storing unreachable frontier with id: ");
-              exploration->storeUnreachableFrontier(global_goal.at(0),global_goal.at(1),global_goal.at(2),robot_str.at(0), global_goal.at(3));
-            }                          
-          }
-        } else
-        {
-          counter++;
-          ROS_INFO("GOAL %d:  rotation", counter);
-          completed_navigation = turn_robot(counter);
-        }
-      }      
       return(completed_navigation);
     }
 
@@ -1025,8 +752,6 @@ class Explorer {
     // what actually moves the robot through the action client
     // returns true if the action succeeded, false on abort, 
     bool move_robot(int seq, double position_x, double position_y) {
-
-      ROS_INFO("nav");
       exploration->next_auction_position_x = position_x;
       exploration->next_auction_position_y = position_y;
 
@@ -1039,8 +764,8 @@ class Explorer {
         ROS_ERROR("Failed to get RobotPose");
       }
 
-      actionlib::SimpleActionClient < move_base_msgs::MoveBaseAction
-        > ac("move_base", true);
+      actionlib::SimpleActionClient < move_base_msgs::MoveBaseAction > 
+        ac("move_base", true);
 
       while (!ac.waitForServer(ros::Duration(10.0)))
         ;
@@ -1066,7 +791,7 @@ class Explorer {
       {
         ros::Duration(0.5).sleep();
       }
-      ROS_INFO("Not longer PENDING");
+      ROS_INFO("Goal is Now Acive");
 
       while (ac.getState() == actionlib::SimpleClientGoalState::ACTIVE)
       {
@@ -1087,58 +812,6 @@ class Explorer {
 
       exploration->next_auction_position_x = robotPose.getOrigin().getX();
       exploration->next_auction_position_y = robotPose.getOrigin().getY();
-      return true;
-    }
-
-    bool turn_robot(int seq) {
-
-      double angle = 45;
-
-      if (!costmap2d_local->getRobotPose(robotPose)) {
-        ROS_ERROR("Failed to get RobotPose");
-      }
-
-      actionlib::SimpleActionClient < move_base_msgs::MoveBaseAction
-        > ac("move_base", true);
-      while (!ac.waitForServer(ros::Duration(10.0)))
-        ;
-
-      move_base_msgs::MoveBaseGoal goal_msgs;
-
-      goal_msgs.target_pose.header.seq = seq;	// increase the sequence number
-      goal_msgs.target_pose.header.stamp = ros::Time::now();
-
-      goal_msgs.target_pose.header.frame_id = move_base_frame;//"map";
-      goal_msgs.target_pose.pose.position.x = robotPose.getOrigin().getX();
-      goal_msgs.target_pose.pose.position.y = robotPose.getOrigin().getY();
-      goal_msgs.target_pose.pose.position.z = 0;
-      goal_msgs.target_pose.pose.orientation.x = 0; //sin(angle/2); // goals[0].pose.orientation.x;
-      goal_msgs.target_pose.pose.orientation.y = 0;
-      goal_msgs.target_pose.pose.orientation.z = sin(angle / 2);
-      goal_msgs.target_pose.pose.orientation.w = cos(angle / 2);
-
-      ac.sendGoal(goal_msgs);
-      ac.waitForResult(ros::Duration(waitForResult));
-
-      while (ac.getState() == actionlib::SimpleClientGoalState::PENDING)
-      {
-        ros::Duration(0.5).sleep();
-      }
-      ROS_INFO("Not longer PENDING");
-
-      while (ac.getState() == actionlib::SimpleClientGoalState::ACTIVE)
-      {
-        ros::Duration(0.5).sleep();
-      }
-      ROS_INFO("Not longer ACTIVE");
-
-      while (ac.getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
-        if (ac.getState() == actionlib::SimpleClientGoalState::ABORTED) {
-          ROS_INFO("ABORTED");                                
-          return false;
-        }
-      }
-      ROS_INFO("ROTATION ACCOMPLISHED");
       return true;
     }
 
@@ -1186,8 +859,6 @@ class Explorer {
 
     // create a costmap
     costmap_2d::Costmap2DROS* costmap2d_local;
-    costmap_2d::Costmap2DROS* costmap2d_local_size;
-    costmap_2d::Costmap2DROS* costmap2d_global;
     costmap_2d::Costmap2D costmap;
 
     std::vector<map_progress_t> map_progress_during_exploration;
@@ -1204,8 +875,7 @@ class Explorer {
     bool robot_prefix_empty;
     int accessing_cluster, cluster_element_size, cluster_element;
     int global_iterattions;
-    bool cluster_flag, cluster_initialize_flag;
-    int global_iterations_counter; 
+    bool cluster_initialize_flag;
     int waitForResult;
     std::string move_base_frame;
     std::string robot_prefix;               /// The prefix for the robot when used in simulation

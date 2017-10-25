@@ -10,6 +10,7 @@
 #include <costmap_2d/costmap_2d.h>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <nav_msgs/OccupancyGrid.h>
 #include <adhoc_communication/ExpFrontier.h>
 #include <adhoc_communication/ExpCluster.h>
 #include <adhoc_communication/ExpAuction.h>
@@ -185,6 +186,7 @@ namespace explorationPlanner
 
       ExplorationPlanner(int robot_id, bool robot_prefix_empty, std::string robot_name_parameter);
       bool respondToAuction(std::vector<requested_cluster_t> requested_cluster_ids, int auction_id_number);
+      bool distanceToRobot(frontier_t front1, frontier_t front2);
       bool clusterIdToElementIds(int cluster_id, std::vector<transform_point_t>* occupied_ids);
       bool initialize_auctioning(std::vector<double> *final_goal);
       bool auctioning(std::vector<double> *final_goal, std::vector<int> *clusters_available_in_pool, std::vector<std::string> *robot_str_name);
@@ -210,8 +212,6 @@ namespace explorationPlanner
       void findFrontiers();
       bool check_efficiency_of_goal(double x, double y);
       void clearVisitedAndSeenFrontiersFromClusters();
-      void clearSeenFrontiers();
-      void clearVisitedFrontiers();
       void clearUnreachableFrontiers();
       bool storeFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
       bool storeVisitedFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
@@ -268,6 +268,8 @@ namespace explorationPlanner
       unsigned int map_width_;
       unsigned int map_height_;
       unsigned int num_map_cells_;
+      geometry_msgs::Pose map_origin_;
+      float resolution_;
   };
 }
 #endif

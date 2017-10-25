@@ -29,12 +29,11 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#define MAX_DISTANCE 2000			// max distance to starting point
-#define MAX_GOAL_RANGE 0.2			// min distance between frontiers (search)
+#define MAX_DISTANCE 2000			      // max distance to starting point
+#define MAX_GOAL_RANGE 0.2			    // min distance between frontiers (search)
 #define MINIMAL_FRONTIER_RANGE 0.2	// distance between frontiers (selection)
-#define INNER_DISTANCE 5			// radius (in cells) around goal point without obstacles (backoff goal point)
-#define MAX_NEIGHBOR_DIST 1			// radius (in cells) around selected goal without obstacles
-#define CLUSTER_MERGING_DIST 0.8	// max (euclidean) distance between clusters that are merged
+#define INNER_DISTANCE 5			      // radius (in cells) around goal point without obstacles (backoff goal point)
+#define MAX_NEIGHBOR_DIST 0.25	    // radius (in cells) around selected goal without obstacles
 
 using namespace explorationPlanner;
 
@@ -158,12 +157,12 @@ bool ExplorationPlanner::clusterFrontiers() {
     {
       std::vector<frontier_t>& main_clus = clusters.at(0).cluster_element;
       main_clus.push_back(frontiers.at(i));
-      for (int j = 1; j <  cluster_indices.size(); j++)
+      for (int j = 1; j < cluster_indices.size(); j++)
       {
         std::vector<frontier_t>& sub_clus = clusters.at(j).cluster_element;
         main_clus.insert(main_clus.end(), sub_clus.begin(), sub_clus.end());
       }
-      clusters.erase(clusters.begin() + 1, clusters.end());
+      clusters.erase(clusters.begin() + 1);
     } else
     {
       cluster_t cluster_new;
@@ -182,7 +181,7 @@ bool ExplorationPlanner::clusterFrontiers() {
  * outputs clusters to the rviz console
  */
 void ExplorationPlanner::visualizeClustersConsole() {
-  ROS_INFO("vizClusters");
+  ROS_INFO("rvizClusters");
 
   // action 3: delete all markers
   visualization_msgs::Marker deleteall;
@@ -701,7 +700,6 @@ bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detect
   }
 
   return true;
-
 }
 
 bool ExplorationPlanner::publish_negotiation_list(
@@ -1074,9 +1072,7 @@ void ExplorationPlanner::auctionCallback(
     transformToOwnCoordinates_frontiers();
     transformToOwnCoordinates_visited_frontiers();
 
-    clearVisitedFrontiers();                       
     clearUnreachableFrontiers();
-    clearSeenFrontiers();       
 
     clearVisitedAndSeenFrontiersFromClusters();
     clusterFrontiers();
@@ -1602,48 +1598,6 @@ void ExplorationPlanner::clearVisitedAndSeenFrontiersFromClusters()
   ROS_INFO("Done");
 }
 
-
-void ExplorationPlanner::clearVisitedFrontiers()
-{
-  /* visited_frontier.at(0) is the Home point. Do not compare
-   * with this point. Otherwise this algorithm deletes it, a new
-   * frontier close to the home point is found which is then again
-   * deleted since it is to close to the home point. This would not
-   * have any impact on the exploration, but in simulation mode 
-   * (simulation = true) the frontier_ID is steadily up counted. 
-   * This is not necessary! 
-   */
-  std::vector<int> goals_to_clear;
-
-  for (int i = 1; i < visited_frontiers.size(); i++)
-  {
-    for (int j = 0; j < frontiers.size(); j++)
-    {
-      double diff_x = visited_frontiers.at(i).x_coordinate - frontiers.at(j).x_coordinate;
-      double diff_y = visited_frontiers.at(i).y_coordinate - frontiers.at(j).y_coordinate;
-
-      if (fabs(diff_x) <= MAX_GOAL_RANGE && fabs(diff_y) <= MAX_GOAL_RANGE) {
-        if(robot_prefix_empty_param == true)
-        {
-          removeStoredFrontier(frontiers.at(j).id, frontiers.at(j).detected_by_robot_str);
-          if(j > 0)
-          {
-            j--;
-          }
-        }else
-        {
-          removeStoredFrontier(frontiers.at(j).id, "");
-          if(j > 0)
-          {
-            j--;
-          }
-        }
-        break;
-      }
-    }
-  }
-}
-
 void ExplorationPlanner::clearUnreachableFrontiers()
 {
   /* visited_frontier.at(0) is the Home point. Do not compare
@@ -1686,67 +1640,6 @@ void ExplorationPlanner::clearUnreachableFrontiers()
   }
 }
 
-void ExplorationPlanner::clearSeenFrontiers()
-{
-  unsigned int mx, my, point;
-  std::vector<int> neighbours, goals_to_clear;
-
-  for(int i = 0; i < frontiers.size(); i++)
-  {
-    unsigned int new_mx, new_my;
-    bool unknown_found = false; 
-    bool obstacle_found = false;
-    bool freespace_found = false;
-
-    mx = 0; 
-    my = 0;
-
-    neighbours = getMapNeighbours(mx, my, 6);
-
-    int adjacent_points[8];
-    getAdjacentPoints(
-        frontiers.at(i).x_coordinate  + frontiers.at(i).y_coordinate * costmap_ros_->info.width, 
-        adjacent_points);
-    for (int j = 0; j < 8; j++)
-    {
-      if (adjacent_points[j] > 0)
-      {
-        if (occupancy_grid_array_[adjacent_points[j]] == -1) 
-        {
-          unknown_found = true;
-        }
-        else if (occupancy_grid_array_[adjacent_points[j]] == 0) 
-        {
-          freespace_found = true;
-        }
-        else if (occupancy_grid_array_[adjacent_points[j]] == 1) 
-        {
-          obstacle_found = true;
-        }
-      }
-    } 
-
-    if(unknown_found == false || obstacle_found == true || freespace_found == false)
-    {
-      if(robot_prefix_empty_param == true)
-      {
-        removeStoredFrontier(frontiers.at(i).id, frontiers.at(i).detected_by_robot_str);
-        if(i > 0)
-        {
-          i--;
-        }
-      }else
-      {
-        removeStoredFrontier(frontiers.at(i).id, "");
-        if(i > 0)
-        {
-          i--;
-        }
-      }
-      seen_frontier_list.push_back(frontiers.at(i));
-    }
-  }
-}
 
 std::vector<int> ExplorationPlanner::getMapNeighbours(unsigned int point_x, unsigned int point_y, int distance)
 {
@@ -1777,6 +1670,7 @@ std::vector<int> ExplorationPlanner::getMapNeighbours(unsigned int point_x, unsi
 void ExplorationPlanner::findFrontiers() {
   ROS_INFO("called find frontiers: %i cells", num_map_cells_); 
   allFrontiers.clear();
+  frontiers.clear();
 
   for (unsigned int i = 0; i < num_map_cells_; i++) {
     int new_frontier_point = isFrontier(i);
@@ -1788,30 +1682,15 @@ void ExplorationPlanner::findFrontiers() {
 
   for (unsigned int i = 0; i < allFrontiers.size(); ++i) {
 
-    int wx = allFrontiers.at(i) % map_width_;
-    int wy = (int)(allFrontiers.at(i) / map_width_);
+    ROS_INFO("%f, %f,", map_origin_.position.x,map_origin_.position.y);
+    double wx = allFrontiers.at(i) % map_width_*resolution_ + map_origin_.position.x + 0.15;
+    double wy = (int)(allFrontiers.at(i) / map_width_)*resolution_ + map_origin_.position.y + 0.15;
 
-    bool enoughDistance = true;
-    // checks to make sure frontiers are far enough apart to store
-    for (unsigned int j = 0; j < frontiers.size(); j++)
-    {
-      if (fabs(wx - frontiers.at(j).x_coordinate) <= MAX_GOAL_RANGE && fabs(wy - frontiers.at(j).y_coordinate) <= MAX_GOAL_RANGE) 
-      {  
-        enoughDistance = false;
-        break;
-      }
-    }
-
-    if (enoughDistance)
-    {
-      storeFrontier(wx,wy,robot_name,robot_str,-1);
-    }
+    storeFrontier(wx,wy,robot_name,robot_str,-1);
   }
 
   ROS_INFO("Size of all frontiers in the list: %lu", frontiers.size());
 }
-
-
 
 bool ExplorationPlanner::auctioning(
     std::vector<double> *final_goal, 
@@ -2557,7 +2436,12 @@ bool ExplorationPlanner::negotiate_Frontier(double x, double y, int detected_by,
 }
 
 
-bool ExplorationPlanner::determine_goal(int strategy, std::vector<double> *final_goal, int count, int actual_cluster_id, std::vector<std::string> *robot_str_name)
+bool ExplorationPlanner::determine_goal(
+    int strategy, 
+    std::vector<double> *final_goal, 
+    int count, 
+    int actual_cluster_id, 
+    std::vector<std::string> *robot_str_name)
 {
   robotPose = costmap_ros_->info.origin.position;
 
@@ -2870,238 +2754,69 @@ bool ExplorationPlanner::determine_goal(int strategy, std::vector<double> *final
   return false;
 }
 
-bool sortCluster(const ExplorationPlanner::cluster_t &lhs, const ExplorationPlanner::cluster_t &rhs)
-{   
-  if(lhs.cluster_element.size() > 1 && rhs.cluster_element.size() > 1)
-  {
-    return lhs.cluster_element.front().dist_to_robot < rhs.cluster_element.front().dist_to_robot; 
-  }
-}
-
 void ExplorationPlanner::sort(int strategy)
 {
-  //    ROS_INFO("Sorting");
-  /*
-   * Following Sort algorithm normalizes all distances to the 
-   * robots actual position. As result, the list is sorted 
-   * from smallest to biggest deviation between goal point and
-   * robot! 
-   */
-  if(strategy == 1)
+  robotPose = costmap_ros_->info.origin.position;
+  if(strategy == 1 || strategy == 2)
   {
-    robotPose = costmap_ros_->info.origin.position;
-
-    if (frontiers.size() > 0) 
-    {
-      for (int i = frontiers.size(); i >= 0; i--) {
-        for (int j = 0; j < frontiers.size() - 1; j++) {
-          double x = frontiers.at(j).x_coordinate - robotPose.x;
-          double y = frontiers.at(j).y_coordinate - robotPose.y;
-          double x_next = frontiers.at(j+1).x_coordinate - robotPose.x;
-          double y_next = frontiers.at(j+1).y_coordinate - robotPose.y;
+    double xCoor = robotPose.x;
+    double yCoor = robotPose.y;
+    std::sort(
+        frontiers.begin(), 
+        frontiers.end(), 
+        [xCoor, yCoor] (frontier_t front1, frontier_t front2) {
+          double x = front1.x_coordinate - xCoor;
+          double y = front1.y_coordinate - yCoor;
+          double x_next = front2.x_coordinate - xCoor;
+          double y_next = front2.y_coordinate - yCoor;
           double euclidean_distance = x * x + y * y;
           double euclidean_distance_next = x_next * x_next + y_next * y_next;
-
-          if (sqrt(euclidean_distance) > sqrt(euclidean_distance_next)) {
-            frontier_t temp = frontiers.at(j+1);                                            
-            frontiers.at(j + 1) = frontiers.at(j);                                          
-            frontiers.at(j) = temp;                  
-          }
-        }
-      }
-    } else 
-    {
-      ROS_INFO("Sorting not possible, no frontiers available!!!");
-    }
-  }
-  else if(strategy == 2)
-  {
-    robotPose = costmap_ros_->info.origin.position;
-
-    if (frontiers.size() > 0) 
-    {
-      for (int i = frontiers.size(); i >= 0; i--) 
-      {
-        for (int j = 0; j < frontiers.size() - 1; j++) {
-          double x = frontiers.at(j).x_coordinate - robotPose.x;
-          double y = frontiers.at(j).y_coordinate - robotPose.y;
-          double x_next = frontiers.at(j+1).x_coordinate - robotPose.x;
-          double y_next = frontiers.at(j+1).y_coordinate - robotPose.y;
-          double euclidean_distance = x * x + y * y;
-          double euclidean_distance_next = x_next * x_next + y_next * y_next;
-
-          if (sqrt(euclidean_distance) > sqrt(euclidean_distance_next)) {
-            frontier_t temp = frontiers.at(j+1);                                            
-            frontiers.at(j + 1) = frontiers.at(j);                                          
-            frontiers.at(j) = temp;                  
-          }
-        }
-      }
-    }else 
-    {
-      ROS_INFO("Sorting not possible, no frontiers available!!!");
-    }
+          return euclidean_distance < euclidean_distance_next;
+        });
   }
   else if(strategy == 3)
   {
     robotPose = costmap_ros_->info.origin.position;
-
-    if (frontiers.size() > 0) 
-    {  
-      check_trajectory_plan();
-
-      for (int i = frontiers.size(); i >= frontiers.size()-10; i--) 
-      {
-
-
-        if(frontiers.size()-i >= frontiers.size())
-        {
-          break;
-        }
-        else
-        {
-          for (int j = 0; j < 10-1; j++) 
-          {
-            if(j >= frontiers.size())
-            {
-              break;
-            }else
-            {
-
-              int dist = frontiers.at(j).distance_to_robot;                                   
-              int dist_next = frontiers.at(j+1).distance_to_robot;
-
-              if (dist > dist_next) {                                          
-                frontier_t temp = frontiers.at(j+1);                                            
-                frontiers.at(j + 1) = frontiers.at(j);                                          
-                frontiers.at(j) = temp;                                          
-              }
-            }
-          }
-        }
-      }
-    } else 
-    {
-      ROS_INFO("Sorting not possible, no frontiers available!!!");
-    }
+    check_trajectory_plan();
+    std::sort(
+        frontiers.begin(), 
+        frontiers.begin() + 10, 
+        [] (frontier_t front1, frontier_t front2) {return front1.distance_to_robot < front2.distance_to_robot;});
   }
   else if(strategy == 4)
   {
-    ROS_INFO("sort(4)");
-    robotPose = costmap_ros_->info.origin.position;
-    double pose_x = robotPose.x;
-    double pose_y = robotPose.y;
-    if(clusters.size() > 0)
-    {
-      for(int cluster_number = 0; cluster_number < clusters.size(); cluster_number++)
-      {
-        if (clusters.at(cluster_number).cluster_element.size() > 0) 
-        {
-          ROS_DEBUG("Cluster %d  size: %lu",cluster_number, clusters.at(cluster_number).cluster_element.size());
-          for (int i = clusters.at(cluster_number).cluster_element.size(); i > 0; i--) 
-          {
-            ROS_DEBUG("Cluster element size: %d", i);
-            for (int j = 0; j < clusters.at(cluster_number).cluster_element.size()-1; j++) 
-            {
-              ROS_DEBUG("Cluster element number: %d", j);
-              double x = clusters.at(cluster_number).cluster_element.at(j).x_coordinate - pose_x;
-              double y = clusters.at(cluster_number).cluster_element.at(j).y_coordinate - pose_y;
-              double x_next = clusters.at(cluster_number).cluster_element.at(j+1).x_coordinate - pose_x;
-              double y_next = clusters.at(cluster_number).cluster_element.at(j+1).y_coordinate - pose_y;
-              double euclidean_distance = x * x + y * y;
-              double euclidean_distance_next = x_next * x_next + y_next * y_next;
-
-              if (sqrt(euclidean_distance) > sqrt(euclidean_distance_next)) 
-              {
-                frontier_t temp = clusters.at(cluster_number).cluster_element.at(j+1);                                            
-                clusters.at(cluster_number).cluster_element.at(j+1) = clusters.at(cluster_number).cluster_element.at(j);                                          
-                clusters.at(cluster_number).cluster_element.at(j) = temp;                  
-              }
-            }
-          }
-        }
-      }
-    }else
-    {
-      ROS_INFO("Sorting not possible, no clusters available!!!");
-    }
-  }        
-  else if(strategy == 5)
-  {
-    ROS_INFO("sort(5)");
     robotPose = costmap_ros_->info.origin.position;
     double pose_x = robotPose.x;
     double pose_y = robotPose.y;
 
-    ROS_DEBUG("Iterating over all cluster elements");
-
-    for(int i = 0; i < clusters.size(); i++)
+    for(int cluster_number = 0; cluster_number < clusters.size(); cluster_number++)
     {
-      for(int j = 0; j < clusters.at(i).cluster_element.size(); j++)
-      {
-        clusters.at(i).cluster_element.at(j).dist_to_robot = 0;
-      }
+      std::sort(
+          clusters.at(cluster_number).cluster_element.begin(), 
+          clusters.at(cluster_number).cluster_element.end(), 
+          [pose_x, pose_y] (frontier_t front1, frontier_t front2) {
+            double x = front1.x_coordinate - pose_x;
+            double y = front1.y_coordinate - pose_y;
+            double x_next = front2.x_coordinate - pose_x;
+            double y_next = front2.y_coordinate - pose_y;
+            double euclidean_distance = x * x + y * y;
+            double euclidean_distance_next = x_next * x_next + y_next * y_next;
+            return euclidean_distance < euclidean_distance_next;
+          });
     }
-
-    for(int i = 0; i < clusters.size(); i++)
-    {
-      if(clusters.at(i).cluster_element.size() > 0)
-      {
-        for(int j = 0; j < clusters.at(i).cluster_element.size(); j++)
-        {
-          double x = clusters.at(i).cluster_element.at(j).x_coordinate - pose_x;
-          double y = clusters.at(i).cluster_element.at(j).y_coordinate - pose_y;
+    std::sort(
+        clusters.begin(), 
+        clusters.end(), 
+        [pose_x, pose_y] (cluster_t clus1, cluster_t clus2) {
+          double x = clus1.cluster_element.at(0).x_coordinate - pose_x;
+          double y = clus1.cluster_element.at(0).y_coordinate - pose_y;
+          double x_next = clus2.cluster_element.at(0).x_coordinate - pose_x;
+          double y_next = clus2.cluster_element.at(0).y_coordinate - pose_y;
           double euclidean_distance = x * x + y * y;
-          int distance = euclidean_distance;
-
-          clusters.at(i).cluster_element.at(j).dist_to_robot = sqrt(distance);
-        }
-      }else
-      {
-        ROS_DEBUG("Erasing Cluster: %d", clusters.at(i).id);
-        cluster_mutex.lock();
-        clusters.erase(clusters.begin() + i);
-        cluster_mutex.unlock();
-        if(i > 0)
-        {
-          i --;
-        }
-      }
-    }
-    ROS_INFO("Starting to sort the clusters itself");
-    std::sort(clusters.begin(), clusters.end(), sortCluster);
+          double euclidean_distance_next = x_next * x_next + y_next * y_next;
+          return euclidean_distance < euclidean_distance_next;
+    });
   }
-  else if(strategy == 6)
-  {
-    ROS_INFO("sort(6)");
-    robotPose = costmap_ros_->info.origin.position;
-    double pose_x = robotPose.x;
-    double pose_y = robotPose.y;
-
-    ROS_DEBUG("Iterating over all cluster elements");
-
-    for(int i = 0; i < clusters.size(); i++)
-    {
-      if(clusters.at(i).cluster_element.size() > 0)
-      {
-        for(int j = 0; j < clusters.at(i).cluster_element.size(); j++)
-        {  
-          random_value = int(rand() % 100);
-          clusters.at(i).cluster_element.at(j).dist_to_robot = random_value;
-        }
-      }else
-      {
-        ROS_DEBUG("Erasing Cluster: %d", clusters.at(i).id);
-        clusters.erase(clusters.begin() + i);
-        if(i > 0)
-        {
-          i --;
-        }
-      }
-    }
-    ROS_DEBUG("Starting to sort the clusters itself");
-    std::sort(clusters.begin(), clusters.end(), sortCluster);  
-  }  
 
   ROS_INFO("Done sorting");
 }
@@ -3120,6 +2835,8 @@ void ExplorationPlanner::updateGlobalCostmap(nav_msgs::OccupancyGrid* cm)
   map_height_ = cm->info.height;
   num_map_cells_ = map_width_ * map_height_;
   occupancy_grid_array_ = cm->data;
+  map_origin_ = cm->info.origin;
+  resolution_ = cm->info.resolution;
   initialized_planner = true;
 }
 
@@ -3143,13 +2860,8 @@ void ExplorationPlanner::simulate() {
 void ExplorationPlanner::visualize_Frontiers()
 {
   ROS_INFO("publishing %lu frontiers", frontiers.size());
-
-  visualization_msgs::Marker marker = createMarker();
-  marker.pose.position.x = 0;
-  marker.pose.position.y = 0;
-  markerArray.markers.push_back(marker);
-
   visualization_msgs::MarkerArray markerArray;
+
   for (int i = 0; i < frontiers.size(); i++)
   {
     visualization_msgs::Marker marker = createMarker();
@@ -3166,7 +2878,8 @@ void ExplorationPlanner::visualize_Frontiers()
  */
 int ExplorationPlanner::isFrontier(int point) {
 
-  if (point <= 0 || occupancy_grid_array_[point] == -1)
+  // ignore invalid points, unknown points, and obstacles
+  if (point <= 0 || occupancy_grid_array_[point] == -1 || occupancy_grid_array_[point] > 50)
     return 0;
 
   int adjacent_points[8];
@@ -3177,35 +2890,34 @@ int ExplorationPlanner::isFrontier(int point) {
     if (adjacent_points[i] > 0 && occupancy_grid_array_[adjacent_points[i]] == -1) 
       return(point);
   }
-
   return 0;
 }
 
 inline visualization_msgs::Marker ExplorationPlanner::createMarker() {
-    visualization_msgs::Marker marker;
+  visualization_msgs::Marker marker;
 
-    marker.header.frame_id = move_base_frame;    
-    marker.header.stamp = ros::Time::now();
-    marker.header.seq = frontier_seq_number++;
-    marker.ns = "marker";
-    marker.id = frontier_seq_number;
-    marker.type = visualization_msgs::Marker::SPHERE;
-    marker.action = visualization_msgs::Marker::ADD;
-    marker.pose.position.z = 0;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
-    marker.scale.x = 0.2;
-    marker.scale.y = 0.2;
-    marker.scale.z = 0.2;
+  marker.header.frame_id = move_base_frame;    
+  marker.header.stamp = ros::Time::now();
+  marker.header.seq = frontier_seq_number++;
+  marker.ns = "marker";
+  marker.id = frontier_seq_number;
+  marker.type = visualization_msgs::Marker::SPHERE;
+  marker.action = visualization_msgs::Marker::ADD;
+  marker.pose.position.z = 0;
+  marker.pose.orientation.x = 0.0;
+  marker.pose.orientation.y = 0.0;
+  marker.pose.orientation.z = 0.0;
+  marker.pose.orientation.w = 1.0;
+  marker.scale.x = 0.2;
+  marker.scale.y = 0.2;
+  marker.scale.z = 0.2;
 
-    marker.color.a = 1.0;
-    marker.color.r = 1.0;
-    marker.color.g = 0.0;
-    marker.color.b = 0.0;               
+  marker.color.a = 1.0;
+  marker.color.r = 1.0;
+  marker.color.g = 0.0;
+  marker.color.b = 0.0;               
 
-    return marker;
+  return marker;
 }
 
 /**
