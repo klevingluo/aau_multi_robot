@@ -174,7 +174,6 @@ bool ExplorationPlanner::clusterFrontiers() {
  * outputs clusters to the rviz console
  */
 void ExplorationPlanner::visualizeClustersConsole() {
-  ROS_INFO("rvizClusters");
 
   // action 3: delete all markers
   visualization_msgs::Marker deleteall;
@@ -2213,6 +2212,16 @@ void ExplorationPlanner::simulate() {
 
 void ExplorationPlanner::visualize_Frontiers()
 {
+
+  // action 3: delete all markers
+  visualization_msgs::Marker deleteall;
+  deleteall.action = 3;
+
+  visualization_msgs::MarkerArray deleteallArray;
+  deleteallArray.markers.push_back(deleteall);              
+
+  pub_frontiers_points.publish <visualization_msgs::MarkerArray>(deleteallArray);
+
   ROS_INFO("publishing %lu frontiers", frontiers.size());
   visualization_msgs::MarkerArray markerArray;
 

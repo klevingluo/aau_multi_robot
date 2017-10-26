@@ -111,8 +111,6 @@ class Explorer {
          * which is localized at the log_path
          */
         initLogPath();
-        csv_file = log_path + std::string("periodical.log");
-        log_file = log_path + std::string("exploration.log"); 
 
         visualize_goal_point(robotPose.getOrigin().getX(),
             robotPose.getOrigin().getY());
@@ -120,19 +118,19 @@ class Explorer {
         exploration = new explorationPlanner::ExplorationPlanner(robot_id, robot_prefix_empty, robot_name);
 
         localCostmapSub = nh.subscribe(
-            "/robot_1/move_base/local_costmap/costmap", 
+            robot_prefix + "move_base/local_costmap/costmap", 
             1, 
             &Explorer::localCostmapCallback,
             this);
 
         globalCostmapSub = nh.subscribe(
-            "/robot_1/map", 
+            robot_prefix + "map", 
             1, 
             &Explorer::globalCostmapCallback,
             this);
 
         odomSub = nh.subscribe(
-            "/robot_1/odom", 
+            robot_prefix + "odom", 
             1, 
             &Explorer::odomCallback,
             this);
@@ -432,8 +430,7 @@ class Explorer {
         navGoal.target_pose.pose.orientation.y = q.getY();
         navGoal.target_pose.pose.orientation.z = q.getZ();
         navGoal.target_pose.pose.orientation.w = q.getW();
-        ac.sendGoal(navGoal);
-        ac.waitForResult();
+        ac.sendGoalAndWait(navGoal, ros::Duration(10));
       }
 
       if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
@@ -523,7 +520,6 @@ class Explorer {
     const unsigned char* occupancy_grid_global;
     const unsigned char* occupancy_grid_local;
 
-    std::string csv_file, log_file;
     std::string log_path;
     std::fstream fs_csv, fs;
 
@@ -567,15 +563,6 @@ int main(int argc, char **argv) {
 
   boost::thread thr_explore(boost::bind(&Explorer::explore, &simple));	
 
-  while (ros::ok()) {
-    ros::spinOnce();
-
-    ros::Duration(0.1).sleep();
-  }
-
-  thr_explore.interrupt();
-
-  thr_explore.join();
-
+  ros::spin();
   return 0;
 }
