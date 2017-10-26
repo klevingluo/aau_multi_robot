@@ -52,7 +52,6 @@ public:
     MapMerger();
     void start();
     void waitForLocalMetaData();
-    void waitForRobotInformation();
     bool transformPointSRV(map_merger::TransformPoint::Request &req,
                            map_merger::TransformPoint::Response &res);
     bool log_output_srv(map_merger::LogMaps::Request &req,
@@ -81,11 +80,9 @@ private:
     bool recomputeTransform(int mapDataIndex);
     void makeEmptyMapData(string robot_name,int height,int width,float resolution);
     void mergeMaps(nav_msgs::OccupancyGrid *mapToMerge,int min_x = 0,int min_y = 0,int max_x = -1,int max_y = -1);
-    void callback_got_robot_for_data(const std_msgs::StringConstPtr &msg);
     void sendControlMessage(std::vector<int>* updateNumbers,std::string dest);
 
     void processLocalMap(nav_msgs::OccupancyGrid * toInsert);
-    void processPosition(geometry_msgs::PoseStamped * pose);
 
     void updateMap(nav_msgs::OccupancyGrid *mapToUpdate,int index_of_transform);
     void updateMapArea(int map_index,nav_msgs::OccupancyGrid *newData,bool clear = false);
@@ -93,7 +90,6 @@ private:
     int findRobotIndex(int transform_index);
     void sendMapOverNetwork(string destination,std::vector<int>* containedUpdates,int start_row = 0,int start_collum = 0,int end_row = -1,int end_collum = -1);
     void sendMetaData(float res = 0.05);
-    void sendBackAskedMapData(string robotName, std::vector<int> missingUpdates );
     nav_msgs::OccupancyGrid* getMapPart(int map_index,int start_x,int start_y,int width,int height);
     nav_msgs::OccupancyGrid* matToMap(const cv::Mat mat, nav_msgs::OccupancyGrid *forInfo);
     bool createLogPath();

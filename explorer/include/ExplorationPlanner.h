@@ -11,6 +11,7 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/Odometry.h>
 #include <adhoc_communication/ExpFrontier.h>
 #include <adhoc_communication/ExpCluster.h>
 #include <adhoc_communication/ExpAuction.h>
@@ -28,6 +29,9 @@ namespace explorationPlanner
         int id;
         int detected_by_robot;  
         std::string detected_by_robot_str; /** robot this was detected by */
+        int mapx;
+        int mapy;
+        int map_index;
         double robot_home_x; 
         double robot_home_y;
         double x_coordinate;
@@ -199,6 +203,7 @@ namespace explorationPlanner
       int calculate_travel_path(double x, double y);
       void updateLocalCostmap(nav_msgs::OccupancyGrid*);
       void updateGlobalCostmap(nav_msgs::OccupancyGrid*);
+      void updateOdom(nav_msgs::Odometry*);
       int estimate_trajectory_plan(double start_x, double start_y, double target_x, double target_y);
       void Callbacks();
       //            void new_robot_callback(const std_msgs::StringConstPtr &msg);
@@ -210,15 +215,11 @@ namespace explorationPlanner
       void visualize_visited_Frontiers();
       void visualizeClustersConsole();
       void findFrontiers();
-      bool check_efficiency_of_goal(double x, double y);
-      void clearVisitedAndSeenFrontiersFromClusters();
       void clearUnreachableFrontiers();
-      bool storeFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
+      bool storeFrontier(int x, int y, int map_index, int detected_by_robot, std::string detected_by_robot_str, int id);
       bool storeVisitedFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
       bool storeUnreachableFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
       bool removeStoredFrontier(int id, std::string detected_by_robot_str);
-      bool publish_frontier_list();
-      bool publish_visited_frontier_list();
       bool publish_negotiation_list(frontier_t negotiation_frontier, int cluster);
       bool subscribe_negotiation_list();
       bool subscribe_frontier_list();
@@ -235,7 +236,6 @@ namespace explorationPlanner
       bool clusterFrontiers();
 
       bool transformToOwnCoordinates_frontiers();
-      bool transformToOwnCoordinates_visited_frontiers();
 
       bool sendToMulticast(std::string multi_cast_group, adhoc_communication::ExpFrontier frontier_to_send, std::string topic);
       bool sendToMulticastAuction(std::string multi_cast_group, adhoc_communication::ExpAuction auction_to_send, std::string topic);
@@ -249,7 +249,6 @@ namespace explorationPlanner
       bool isFree(int point);
       inline bool isValid(int point);
       inline void getAdjacentPoints(int point, int points[]);
-      std::vector<int> getMapNeighbours(unsigned int point_x, unsigned int point_y, int distance);
       int backoff (int point);
 
       nav_msgs::OccupancyGrid *costmap_ros_;
@@ -269,6 +268,7 @@ namespace explorationPlanner
       unsigned int map_height_;
       unsigned int num_map_cells_;
       geometry_msgs::Pose map_origin_;
+      nav_msgs::Odometry *odom;
       float resolution_;
   };
 }

@@ -52,7 +52,6 @@ MapMerger::MapMerger() {
     else
       robot_name = std::string(hostname_c);
   }
-  nodeHandle->param<bool>("splitted",splitted,true);;
   nodeHandle->param<bool>("debug",debug,true);
   nodeHandle->param<bool>("has_local_map",has_local_map,true);
   nodeHandle->param<bool>("exchange_position",exchange_position,false);
@@ -95,65 +94,6 @@ void MapMerger::waitForLocalMetaData() {
       break;
   }
   ROS_INFO("Got map_meta_data");
-  if(!splitted) {
-    size = map_height;
-  }
-}
-
-/**
- * registers callbacks for new robots
- */
-void MapMerger::waitForRobotInformation() {
-  ROS_INFO("Wait to get a map from other robot");
-  ros::Subscriber sub =nodeHandle->subscribe(
-      robot_prefix+"/adhoc_communication/new_robot",
-      1000,
-      &MapMerger::callback_got_robot_for_data,
-      this);
-
-  ros::ServiceClient getNeighborsClient = 
-    nodeHandle->serviceClient<adhoc_communication::GetNeighbors>
-    (robot_prefix+"/adhoc_communication/get_neighbors");
-  adhoc_communication::GetNeighbors getNeighbors;
-  ros::Duration(0.1).sleep();
-  ros::AsyncSpinner spinner(10);
-  spinner.start();
-  ros::Duration(3).sleep();
-  if(getNeighborsClient.call(getNeighbors))
-  {
-    ROS_INFO("%lu robots are already in the network, adding them,my name:%s",getNeighbors.response.neigbors.size(),
-        robot_name.c_str());
-    if(getNeighbors.response.neigbors.size() > 0)
-    {
-      for(int i = 0; i < getNeighbors.response.neigbors.size();i++)
-      {
-        std::string newRobotName = getNeighbors.response.neigbors.at(i);
-        if(newRobotName == robot_name)
-        {
-          ROS_WARN("Got my own name as a neigbor!");
-          continue;
-        }
-      }
-    }
-    else
-    {
-      ROS_INFO("No robots are were in the network before me");
-    }
-  }
-  while(ros::ok())
-  {
-    ROS_INFO("No robot information");
-    ros::spinOnce();
-    ros::Duration(0.3).sleep();
-    if(robot_name != "BASE")
-      break;
-  }
-}
-
-// Called on self with own name
-void MapMerger::callback_got_robot_for_data(const std_msgs::StringConstPtr &msg) {
-  ROS_INFO("Using %s as pseudo local map", msg.get()->data.c_str());
-  this->robot_name = msg.get()->data;
 }
 
 // called on other robots entering range
@@ -181,22 +121,21 @@ void MapMerger::callback_new_robot(const std_msgs::StringConstPtr &msg) {
       return;
     }
   }
+
+  // robot not seen before
   ROS_INFO("New robot:%s",newRobotName.c_str());
 
   // we should initialize all robot specific data here, so that we don't have to keep track of different arrays in different indices
   robots->push_back(newRobotName);
   new_data_maps->push_back(false);
   transforms->push_back(Mat(0,0, CV_64F, double(0)));
-
   robots_in_transform->push_back(newRobotName);
 
   updateMan->addNewUpdateList();
   makeEmptyMapData(newRobotName,map_height,map_width,local_map->info.resolution);
-  ROS_INFO("asking %s for map in new Robot",newRobotName.c_str());
-  std::vector<int>* empty = new std::vector<int>();
-  sendControlMessage(empty,newRobotName);
 
-  delete empty;
+  ROS_INFO("asking %s for map in new Robot",newRobotName.c_str());
+  sendControlMessage(new std::vector<int>(),newRobotName);
 }
 
 // responds to a map request by sending the local map, the whole thing
@@ -389,7 +328,6 @@ void MapMerger::callback_global_pub(const ros::TimerEvent &e) {
 void MapMerger::callback_send_position(const ros::TimerEvent &e)
 {
   ROS_DEBUG("Sending Position, x:%f|y:%f",cur_position->pose.position.x,cur_position->pose.position.y);
-  processPosition(cur_position);
 
   ROS_DEBUG("Publish my position");
   visualization_msgs::Marker m;
@@ -777,26 +715,6 @@ void MapMerger::processLocalMap(nav_msgs::OccupancyGrid * toInsert)
   return;
 }
 
-// looks like it's sending its position to itself, wierd
-void MapMerger::processPosition(geometry_msgs::PoseStamped * pose) {
-  ros::ServiceClient client = nodeHandle->serviceClient<adhoc_communication::SendMmRobotPosition>
-    (robot_prefix + "/adhoc_communication/send_position");
-  adhoc_communication::SendMmRobotPosition exchange;
-  exchange.request.topic = position_other_robots_topic;
-  exchange.request.dst_robot = "mc_"+robot_name;
-  exchange.request.position.position.pose = pose->pose;
-  exchange.request.position.src_robot = robot_name;
-  if(client.call(exchange))
-  {
-    if(exchange.response.status)
-      ROS_DEBUG("Could  send position");
-    else
-      ROS_WARN("Problem sending position");
-  }
-  else
-    ROS_DEBUG("Could not call service to send position");
-}
-
 void MapMerger::start()
 {
   ROS_INFO("Started MapMerger");
@@ -897,7 +815,7 @@ void MapMerger::start()
   ros::Duration(1).sleep();
 
   ask_other_timer = nodeHandle->createTimer(
-      ros::Duration(10),
+      ros::Duration(30),
       &MapMerger::callback_ask_other_robots,
       this);
 
@@ -1350,7 +1268,6 @@ bool MapMerger::createLogPath()
   return true;
 }
 
-
 /**
  * \brief Saves progress to log.
  * Saves log information to the hard drive. At this point log information may include
@@ -1487,10 +1404,8 @@ bool MapMerger::log_output_srv(map_merger::LogMaps::Request &req, map_merger::Lo
       cv::imwrite(file.c_str(),glo);
     ROS_DEBUG("Successfully logged global map.");
   }
-  ROS_DEBUG("<-- end log_output_srv");
   return true;
 }
-
 
 bool MapMerger::transformPointSRV(map_merger::TransformPoint::Request &req, map_merger::TransformPoint::Response &res)
 {
@@ -1536,31 +1451,6 @@ bool MapMerger::transformPointSRV(map_merger::TransformPoint::Request &req, map_
   res.point.y = (outPts.at(0).y - map_height / 2) * 0.05;
   res.point.src_robot = robot_hostname;
   return true;
-}
-
-void MapMerger::sendBackAskedMapData(string robotName, std::vector<int> missingUpdates)
-{
-  int min_x = map_width;
-  int max_x = 0;
-  int min_y = map_height;
-  int max_y = 0;
-  for(int i = 0; i < missingUpdates.size()  ;i++)
-  {
-    UpdateEntry * tmp = update_list->at(missingUpdates.at(i));
-    if(tmp->getMaxX() > max_x)
-      max_x = tmp->getMaxX();
-    if(tmp->getMaxY() > max_y)
-      max_y = tmp->getMaxY();
-    if(tmp->getMinX() > min_x)
-      min_x = tmp->getMinX();
-    if(tmp->getMinY() > max_y)
-      min_y = tmp->getMinY();
-  }
-  ROS_INFO("Sending missed map updates to %s",robotName.c_str());
-  std::vector<int>* containedUpdates = new std::vector<int>();
-  containedUpdates->push_back(update_seq);
-  sendMapOverNetwork(robotName,containedUpdates,min_x,min_y,max_x,max_y);
-  delete containedUpdates;
 }
 
 /**
