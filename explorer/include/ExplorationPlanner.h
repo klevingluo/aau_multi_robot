@@ -96,7 +96,7 @@ namespace explorationPlanner
       ros::ServiceClient client;
 
       ros::Publisher pub_frontiers, pub_visited_frontiers, pub_negotion, pub_negotion_first, pub_Point;
-      ros::Publisher pub_frontiers_points, pub_visited_frontiers_points;
+      ros::Publisher pub_frontiers_points; 
       ros::Publisher pub_auctioning, pub_auctioning_status; 
       ros::Subscriber sub_frontiers, sub_visited_frontiers, sub_negotioation, sub_negotioation_first;
       ros::Subscriber sub_control;

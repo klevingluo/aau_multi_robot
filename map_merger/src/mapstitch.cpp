@@ -1,27 +1,27 @@
 /** Copyright (c) 2013, TU Darmstadt, Philipp M. Scholl
-All rights reserved.
+  All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are met:
 
-Redistributions of source code must retain the above copyright notice, this
-list of conditions and the following disclaimer.  Redistributions in binary
-form must reproduce the above copyright notice, this list of conditions and the
-following disclaimer in the documentation and/or other materials provided with
-the distribution.  Neither the name of the <ORGANIZATION> nor the names of its
-contributors may be used to endorse or promote products derived from this
-software without specific prior written permission.  THIS SOFTWARE IS PROVIDED
-BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
-WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
-EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
-OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
-ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+  Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.  Redistributions in binary
+  form must reproduce the above copyright notice, this list of conditions and the
+  following disclaimer in the documentation and/or other materials provided with
+  the distribution.  Neither the name of the <ORGANIZATION> nor the names of its
+  contributors may be used to endorse or promote products derived from this
+  software without specific prior written permission.  THIS SOFTWARE IS PROVIDED
+  BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO
+  EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+  INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+  OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
 #include "mapstitch.h"
 #include "math.h"
 #include <opencv2/opencv.hpp>
@@ -36,8 +36,14 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   // load images
   image1 = img1.clone();
   image2 = img2.clone();
-  if(image1.size != image2.size)
-      cv::resize(image2,image2,image1.size());
+  //if(image1.size != image2.size)
+  //   cv::resize(image2,image2,image1.size());
+
+  std::stringstream timestamp;
+  timestamp << std::time(0);
+
+  cv::imwrite(timestamp.str() + "img1.png",image1);
+  cv::imwrite(timestamp.str() + "img2.png",image2);
 
   // create feature detector set.
   Ptr<ORB> detector = ORB::create();
@@ -54,11 +60,11 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   // 3. match keypoints
   // seems to need 450 kpv for a good match - kevin
   // actually this seems not needed, will investigate further
-  if(kpv1.size() < 50 || kpv2.size() < 50 ) {
-      ROS_WARN("Not enough KPV");
-      works = false;
-      return;
-  }
+  // if(kpv1.size() < 50 || kpv2.size() < 50 ) {
+  //   ROS_WARN("Not enough KPV");
+  //   works = false;
+  //   return;
+  // }
 
   dematc->match(dscv1, dscv2, matches);
   ROS_INFO("Kpv1:%i entries\t Kpv2:%i entries\t matches: %i",
@@ -70,20 +76,20 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   // TODO: figure out why we need to find matching pairs
   for (size_t i=0; i<matches.size(); i++) {
     KeyPoint a1 = kpv1[matches[i].queryIdx],
-             b1 = kpv2[matches[i].trainIdx];
+    b1 = kpv2[matches[i].trainIdx];
 
     if (matches[i].distance > 30)
       continue;
 
     for (size_t j=0; j<matches.size(); j++) {
       KeyPoint a2 = kpv1[matches[j].queryIdx],
-               b2 = kpv2[matches[j].trainIdx];
+      b2 = kpv2[matches[j].trainIdx];
 
       if (matches[j].distance > 30)
         continue;
 
       if ( fabs(norm(a1.pt-a2.pt) - norm(b1.pt-b2.pt)) > max_pairwise_distance ||
-           fabs(norm(a1.pt-a2.pt) - norm(b1.pt-b2.pt)) == 0)
+          fabs(norm(a1.pt-a2.pt) - norm(b1.pt-b2.pt)) == 0)
         continue;
 
       // points used for matching
@@ -100,21 +106,20 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
     }
   }
 
-  // cv::imwrite("img1.pgm",image1);
   // ROS_INFO("Found %i matches",matches.size());
   if(coord1.size() < 1) {
-      ROS_WARN("Not enough matching points found, map likely not big enough \n Coord1:%lu",coord1.size());
-      works = false;
-      return;
+    ROS_WARN("Not enough matching points found, map likely not big enough \n Coord1:%lu",coord1.size());
+    works = false;
+    return;
   }
 
   ROS_DEBUG("Compute estimateRigid");
   // TODO figure out why this would fail
   H = estimateRigidTransform(coord2, coord1, false);
   if(H.empty()) {
-      ROS_WARN("H contain no data, cannot find valid transformation");
-      works = false;
-      return;
+    ROS_WARN("H contain no data, cannot find valid transformation");
+    works = false;
+    return;
   }
   //ROS_DEBUG("H: size:%lu|empty:%i",H.size,H.empty());
 
@@ -129,183 +134,183 @@ StitchedMap::StitchedMap(Mat &img1, Mat &img2, int max_trans, int max_rotation, 
   float scale_change = 0.05;
 
   if(scalex > 1 + scale_change || scaley > 1 + scale_change) {
-      ROS_WARN("Map should not scale change is to lagre");
-      works = false;
-      return;
+    ROS_WARN("Map should not scale change is to lagre");
+    works = false;
+    return;
   }
   if(scalex < 1 - scale_change|| scaley < 1 - scale_change) {
-      ROS_WARN("Map should not scale change is to small");
-      works = false;
-      return;
+    ROS_WARN("Map should not scale change is to small");
+    works = false;
+    return;
   }
   if(max_trans != -1) {
-      if(transx > max_trans || transy > max_trans)
-      {
-          ROS_WARN("Map should not trans so strong");
-          works = false;
-          return;
-      }
+    if(transx > max_trans || transy > max_trans)
+    {
+      ROS_WARN("Map should not trans so strong");
+      works = false;
+      return;
+    }
   }
   if(max_rotation != -1)
   {
-      if(rotation > max_rotation || rotation < -1 * max_rotation)
-      {
-          ROS_WARN("Map should not rotate so strong");
-          works = false;
-          return;
-      }
+    if(rotation > max_rotation || rotation < -1 * max_rotation)
+    {
+      ROS_WARN("Map should not rotate so strong");
+      works = false;
+      return;
+    }
   }
 
   // the current transform, used as a starting point for future transforms
   cur_trans = H;
   ROS_DEBUG("Finished estimateRigid");
   //evaluade transformation
-  
+
   if(works) {
-      Mat tmp (image2.size(),image2.type());
-      Mat thr;
+    Mat tmp (image2.size(),image2.type());
+    Mat thr;
 
-      Mat image(image2.size(), image2.type());
-      warpAffine(image2,image,H,image.size());
-      addWeighted(image,.5,image1,.5,0.0,image);
+    Mat image(image2.size(), image2.type());
+    warpAffine(image2,image,H,image.size());
+    addWeighted(image,.5,image1,.5,0.0,image);
 
-      warpAffine(image2,tmp,H,image2.size());
-      addWeighted(tmp,.5,image1,.5,0.0,image);
-      //cvtColor(image1,tmp,CV_BGR2GRAY);
-      threshold(tmp,thr,0,255,THRESH_BINARY);
-      Mat K=(Mat_<uchar>(5,5)<<   0,  0,  1,  0,  0,\
-                                     0,  0,  1,  0,  0,\
-                                     1,  1,  1,  1,  1,\
-                                     0,  0,  1,  0,  0,\
-                                     0,  0,  1,  0,  0);
+    warpAffine(image2,tmp,H,image2.size());
+    addWeighted(tmp,.5,image1,.5,0.0,image);
+    //cvtColor(image1,tmp,CV_BGR2GRAY);
+    threshold(tmp,thr,0,255,THRESH_BINARY);
+    Mat K=(Mat_<uchar>(5,5)<<   0,  0,  1,  0,  0,\
+        0,  0,  1,  0,  0,\
+        1,  1,  1,  1,  1,\
+        0,  0,  1,  0,  0,\
+        0,  0,  1,  0,  0);
 
-      erode(thr,thr,K,Point(-1,-1),1,BORDER_CONSTANT);
-         vector< vector <Point> > contours; // Vector for storing contour
-         vector< Vec4i > hierarchy;
-         findContours( thr, contours, hierarchy,CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
-         for( int i = 0; i< contours.size(); i++ )
-         {
-            Rect r= boundingRect(contours[i]);
-            rects2.push_back(r);
-            rectangle(tmp,Point(r.x,r.y), Point(r.x+r.width,r.y+r.height), Scalar(0,0,255),2,8,0);
-          }//Opened contour
+    erode(thr,thr,K,Point(-1,-1),1,BORDER_CONSTANT);
+    vector< vector <Point> > contours; // Vector for storing contour
+    vector< Vec4i > hierarchy;
+    findContours( thr, contours, hierarchy,CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
+    for( int i = 0; i< contours.size(); i++ )
+    {
+      Rect r= boundingRect(contours[i]);
+      rects2.push_back(r);
+      rectangle(tmp,Point(r.x,r.y), Point(r.x+r.width,r.y+r.height), Scalar(0,0,255),2,8,0);
+    }//Opened contour
 
-         Mat thr1;
-         //cvtColor(image1,tmp,CV_BGR2GRAY);
-         threshold(image1,thr1,0,255,THRESH_BINARY);
-         erode(thr1,thr1,K,Point(-1,-1),1,BORDER_CONSTANT);
-            vector< vector <Point> > contours1; // Vector for storing contour
-            vector< Vec4i > hierarchy1;
-            findContours( thr1, contours1, hierarchy1,CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
+    Mat thr1;
+    //cvtColor(image1,tmp,CV_BGR2GRAY);
+    threshold(image1,thr1,0,255,THRESH_BINARY);
+    erode(thr1,thr1,K,Point(-1,-1),1,BORDER_CONSTANT);
+    vector< vector <Point> > contours1; // Vector for storing contour
+    vector< Vec4i > hierarchy1;
+    findContours( thr1, contours1, hierarchy1,CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
 
-            for( int i = 0; i< contours1.size(); i++ ){
-             Rect r= boundingRect(contours1[i]);
-             rects1.push_back(r);
-             //rectangle(image1,Point(r.x,r.y), Point(r.x+r.width,r.y+r.height), Scalar(0,0,255),2,8,0);
-             }//Opened contour
-         vector<Rect> near1,near2;
-         int offset = 5;
-         for(int i = 0; i < rects1.size(); i++)
-         {
-             Rect ri = rects1.at(i);
-             if(ri.x == 1 && ri.y == 1)
-                 continue;
-             for(int j = 0; j < rects2.size();j++)
-             {
-                 Rect rj = rects2.at(j);
-                 if(ri.x < rj.x + offset && ri.x > rj.x -offset)
-                 {
-                     if(ri.y < rj.y + offset && ri.y > rj.y -offset)
-                     {
-                         near1.push_back(ri);
-                         near2.push_back(rj);
-                     }
-                 }
-             }
-         }
-         double eudis = 0;
-         double disX,disY;
-         for(int i = 0; i < near1.size(); i++)
-         {
-             Rect ri = near1.at(i);
-             Rect rj = near2.at(i);
-             disX = ri.x - rj.x;
-             disY = ri.y - rj.y;
-             if(disX < 0)
-                 disX = disX * (-1);
-             if(disY < 0)
-                 disY = disY * (-1);
-             eudis += sqrt((disX*disX)+(disY*disY));
-         }
-         if(near1.size() < 2)
-             eudis = -1;
-         else
-             eudis = eudis / near1.size();
-         ROS_DEBUG("EudisNew:%f\t near1Size:%lu:\toldTran:%i",eudis,near1.size(),oldTransform.empty());
-         //calc EudisOld
+    for( int i = 0; i< contours1.size(); i++ ){
+      Rect r= boundingRect(contours1[i]);
+      rects1.push_back(r);
+      //rectangle(image1,Point(r.x,r.y), Point(r.x+r.width,r.y+r.height), Scalar(0,0,255),2,8,0);
+    }//Opened contour
+    vector<Rect> near1,near2;
+    int offset = 5;
+    for(int i = 0; i < rects1.size(); i++)
+    {
+      Rect ri = rects1.at(i);
+      if(ri.x == 1 && ri.y == 1)
+        continue;
+      for(int j = 0; j < rects2.size();j++)
+      {
+        Rect rj = rects2.at(j);
+        if(ri.x < rj.x + offset && ri.x > rj.x -offset)
+        {
+          if(ri.y < rj.y + offset && ri.y > rj.y -offset)
+          {
+            near1.push_back(ri);
+            near2.push_back(rj);
+          }
+        }
+      }
+    }
+    double eudis = 0;
+    double disX,disY;
+    for(int i = 0; i < near1.size(); i++)
+    {
+      Rect ri = near1.at(i);
+      Rect rj = near2.at(i);
+      disX = ri.x - rj.x;
+      disY = ri.y - rj.y;
+      if(disX < 0)
+        disX = disX * (-1);
+      if(disY < 0)
+        disY = disY * (-1);
+      eudis += sqrt((disX*disX)+(disY*disY));
+    }
+    if(near1.size() < 2)
+      eudis = -1;
+    else
+      eudis = eudis / near1.size();
+    ROS_DEBUG("EudisNew:%f\t near1Size:%lu:\toldTran:%i",eudis,near1.size(),oldTransform.empty());
+    //calc EudisOld
 
-         Mat thr3,tmp1;
-         //cvtColor(image1,tmp,CV_BGR2GRAY);
-         if(oldTransform.empty())
-             return;
-         warpAffine(image2,tmp1,oldTransform,image2.size());
-         threshold(tmp1,thr3,0,255,THRESH_BINARY);
+    Mat thr3,tmp1;
+    //cvtColor(image1,tmp,CV_BGR2GRAY);
+    if(oldTransform.empty())
+      return;
+    warpAffine(image2,tmp1,oldTransform,image2.size());
+    threshold(tmp1,thr3,0,255,THRESH_BINARY);
 
-         erode(thr3,thr3,K,Point(-1,-1),1,BORDER_CONSTANT);
-            vector< vector <Point> > contours3; // Vector for storing contour
-            vector< Vec4i > hierarchy3;
-            findContours( thr3, contours3, hierarchy3,CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
+    erode(thr3,thr3,K,Point(-1,-1),1,BORDER_CONSTANT);
+    vector< vector <Point> > contours3; // Vector for storing contour
+    vector< Vec4i > hierarchy3;
+    findContours( thr3, contours3, hierarchy3,CV_RETR_CCOMP, CV_CHAIN_APPROX_SIMPLE );
 
-            for( int i = 0; i< contours3.size(); i++ ){
-             Rect r= boundingRect(contours3[i]);
-             rects3.push_back(r);
-            }//Opened contour
-            near1.clear();
-            near2.clear();
-            for(int i = 0; i < rects1.size(); i++)
-            {
-                Rect ri = rects1.at(i);
-                if(ri.x == 1 && ri.y == 1)
-                    continue;
-                for(int j = 0; j < rects3.size();j++)
-                {
-                    Rect rj = rects3.at(j);
-                    if(ri.x < rj.x + offset && ri.x > rj.x -offset)
-                    {
-                        if(ri.y < rj.y + offset && ri.y > rj.y -offset)
-                        {
-                            near1.push_back(ri);
-                            near2.push_back(rj);
-                        }
-                    }
-                }
-            }
-            double eudisOLD = 0;
-            for(int i = 0; i < near1.size(); i++)
-            {
-                Rect ri = near1.at(i);
-                Rect rj = near2.at(i);
-                disX = ri.x - rj.x;
-                disY = ri.y - rj.y;
-                if(disX < 0)
-                    disX = disX * (-1);
-                if(disY < 0)
-                    disY = disY * (-1);
-                eudisOLD += sqrt((disX*disX)+(disY*disY));
-            }
-            if(near1.size() < 2)
-                eudis = -1;
-            else
-                eudisOLD = eudisOLD / near1.size();
-            //if(eudisOLD < eudis)
-               // works = false;
-            ROS_WARN("EudisOLD:%f\t near1Size:%lu:|works:%i",eudis,near1.size(),works);
-            //calc EudisOld
-         /*  for(int i = 0; i < rects1.size(); i++)
-           {
-               Rect r = rects1.at(i);
-               rectangle(image1,Point(r.x,r.y), Point(r.x+r.width,r.y+r.height), Scalar(0,0,255),2,8,0);
-            }*/
+    for( int i = 0; i< contours3.size(); i++ ){
+      Rect r= boundingRect(contours3[i]);
+      rects3.push_back(r);
+    }//Opened contour
+    near1.clear();
+    near2.clear();
+    for(int i = 0; i < rects1.size(); i++)
+    {
+      Rect ri = rects1.at(i);
+      if(ri.x == 1 && ri.y == 1)
+        continue;
+      for(int j = 0; j < rects3.size();j++)
+      {
+        Rect rj = rects3.at(j);
+        if(ri.x < rj.x + offset && ri.x > rj.x -offset)
+        {
+          if(ri.y < rj.y + offset && ri.y > rj.y -offset)
+          {
+            near1.push_back(ri);
+            near2.push_back(rj);
+          }
+        }
+      }
+    }
+    double eudisOLD = 0;
+    for(int i = 0; i < near1.size(); i++)
+    {
+      Rect ri = near1.at(i);
+      Rect rj = near2.at(i);
+      disX = ri.x - rj.x;
+      disY = ri.y - rj.y;
+      if(disX < 0)
+        disX = disX * (-1);
+      if(disY < 0)
+        disY = disY * (-1);
+      eudisOLD += sqrt((disX*disX)+(disY*disY));
+    }
+    if(near1.size() < 2)
+      eudis = -1;
+    else
+      eudisOLD = eudisOLD / near1.size();
+    //if(eudisOLD < eudis)
+    // works = false;
+    ROS_WARN("EudisOLD:%f\t near1Size:%lu:|works:%i",eudis,near1.size(),works);
+    //calc EudisOld
+    /*  for(int i = 0; i < rects1.size(); i++)
+        {
+        Rect r = rects1.at(i);
+        rectangle(image1,Point(r.x,r.y), Point(r.x+r.width,r.y+r.height), Scalar(0,0,255),2,8,0);
+        }*/
 
   }
   return;
@@ -320,7 +325,7 @@ StitchedMap::get_debug() {
   return out;
 }
 
-Mat // return the stitched maps
+  Mat // return the stitched maps
 StitchedMap::get_stitch()
 {
   // create storage for new image and get transformations
@@ -332,6 +337,5 @@ StitchedMap::get_stitch()
 
   return image;
 }
-
 
 StitchedMap::~StitchedMap() { }

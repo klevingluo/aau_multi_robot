@@ -93,8 +93,6 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   ssendFrontier = nh_service->serviceClient<adhoc_communication::SendExpFrontier>(sendFrontier_msgs);
   ssendAuction = nh_service->serviceClient<adhoc_communication::SendExpAuction>(sendAuction_msgs);
 
-  pub_visited_frontiers_points = nh_visited_Point.advertise <visualization_msgs::MarkerArray> ("visitedfrontierPoints", 2000, true);
-
   pub_clusters = nh.advertise <visualization_msgs::MarkerArray> ("clusters", 200, true);
 
   pub_Point = nh_Point.advertise < geometry_msgs::PointStamped> ("goalPoint", 100, true);
@@ -429,8 +427,8 @@ bool ExplorationPlanner::storeFrontier(
   }
 
   new_frontier.detected_by_robot = detected_by_robot;
-  new_frontier.x_coordinate = x * resolution_ + map_origin_.position.x + 0.15;       
-  new_frontier.y_coordinate = y * resolution_ + map_origin_.position.y + 0.15;
+  new_frontier.x_coordinate = x * resolution_ + map_origin_.position.x + resolution_ / 2.0;       
+  new_frontier.y_coordinate = y * resolution_ + map_origin_.position.y + resolution_ / 2.0;
   new_frontier.mapx = x + (int)(map_origin_.position.x);
   new_frontier.mapy = y + (int)(map_origin_.position.y);
   new_frontier.map_index = map_index;
@@ -445,29 +443,10 @@ bool ExplorationPlanner::storeFrontier(
 bool ExplorationPlanner::removeStoredFrontier(int id, std::string detected_by_robot_str) {
   for(int i= 0; i < frontiers.size(); i++)
   {
-    if(robot_prefix_empty_param == true)
+    ROS_DEBUG("Removing frontier with id '%d' detected by robot '%s'", frontiers.at(i).id, frontiers.at(i).detected_by_robot_str.c_str());
+    if(frontiers.at(i).id == id)
     {
-      ROS_DEBUG("Removing frontier with id '%d' detected by robot '%s'", frontiers.at(i).id, frontiers.at(i).detected_by_robot_str.c_str());
-      if(frontiers.at(i).id == id && frontiers.at(i).detected_by_robot_str.compare(detected_by_robot_str) == 0)
-      {
-        ROS_DEBUG("Removing Frontier ID: %d  at position: %d  of Robot: %s", frontiers.at(i).id, i, frontiers.at(i).detected_by_robot_str.c_str());
-        store_frontier_mutex.lock();
-        frontiers.erase(frontiers.begin()+i);
-        store_frontier_mutex.unlock();
-      }
-    }else
-    {
-      if(frontiers.at(i).id == id)
-      {
-        store_frontier_mutex.lock();
-        frontiers.erase(frontiers.begin()+i);
-        if(i > 0)
-        {
-          i --;
-        }
-        store_frontier_mutex.unlock();
-        break;
-      }
+      frontiers.erase(frontiers.begin()+i);
     }
   }
   return true;
@@ -542,67 +521,29 @@ bool ExplorationPlanner::storeVisitedFrontier(double x, double y, int detected_b
  * store a new frontier, mark it as unreachable, 
  * then check it it is in any existing clusters, add to unreachable count if so
  */
-bool ExplorationPlanner::storeUnreachableFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id)
+bool ExplorationPlanner::storeUnreachableFrontier(
+    double x, 
+    double y, 
+    int detected_by_robot, 
+    std::string detected_by_robot_str, 
+    int id)
 {
   frontier_t unreachable_frontier;
 
-  if(robot_prefix_empty_param == true)
-  {        
-    ROS_DEBUG("Storing Unreachable Frontier ID: %d   Robot: %s", unreachable_frontier_id_count, detected_by_robot_str.c_str());
-
-    if(id != -1)
-    {
-      unreachable_frontier.id = id;
-    }else
-    {
-      unreachable_frontier.id = unreachable_frontier_id_count++;
-    }
-
-    unreachable_frontier.detected_by_robot_str = detected_by_robot_str;
-    unreachable_frontier.x_coordinate = x;
-    unreachable_frontier.y_coordinate = y;
-
-    unreachable_frontiers.push_back(unreachable_frontier);
-
-  }else
+  if(detected_by_robot != robot_name)
   {
-    if(detected_by_robot != robot_name)
-    {
-      unreachable_frontier.id = id;
-    }
-    else
-    {
-      unreachable_frontier.id = (robot_name * 10000) + unreachable_frontier_id_count++; 
-    }
-
-    unreachable_frontier.detected_by_robot = detected_by_robot;
-    unreachable_frontier.x_coordinate = x;
-    unreachable_frontier.y_coordinate = y;
-
-    frontiers.push_back(unreachable_frontier);
+    unreachable_frontier.id = id;
+  }
+  else
+  {
+    unreachable_frontier.id = (robot_name * 10000) + unreachable_frontier_id_count++; 
   }
 
+  unreachable_frontier.detected_by_robot = detected_by_robot;
+  unreachable_frontier.x_coordinate = x;
+  unreachable_frontier.y_coordinate = y;
 
-  bool break_flag = false; 
-  for(int i = 0; i < clusters.size(); i++)
-  {
-    for(int j = 0; j < clusters.at(i).cluster_element.size(); j++)
-    {
-      if(clusters.at(i).cluster_element.at(j).id == id)
-      {
-        clusters.at(i).unreachable_frontier_count++;
-        break_flag = true; 
-        break;
-      }           
-    }
-    if(break_flag == true)
-    {
-      ROS_INFO("unreachable frontier marked in cluster: %i", clusters.at(i).unreachable_frontier_count);
-      break;
-    }
-  }
-
-  return true;
+  unreachable_frontiers.push_back(unreachable_frontier);
 }
 
 bool ExplorationPlanner::publish_negotiation_list(
@@ -1286,14 +1227,6 @@ void ExplorationPlanner::visited_frontierCallback(const adhoc_communication::Exp
 
 void ExplorationPlanner::clearUnreachableFrontiers()
 {
-  /* visited_frontier.at(0) is the Home point. Do not compare
-   * with this point. Otherwise this algorithm deletes it, a new
-   * frontier close to the home point is found which is then again
-   * deleted since it is to close to the home point. This would not
-   * have any impact on the exploration, but in simulation mode 
-   * (simulation = true) the frontier_ID is steadily up counted. 
-   * This is not necessary! 
-   */
   std::vector<int> goals_to_clear;
 
   for (int i = 1; i < unreachable_frontiers.size(); i++)
@@ -2058,11 +1991,11 @@ bool ExplorationPlanner::determine_goal(
     }
 
     cv::Mat kernel = (cv::Mat_<double>(5,5) << 
-        0,  0,  1,  0, 0, 
-        0, 1, -3, 1, 0, 
-        1, -3, -5, -3, 1, 
-        0,  1, -3, 1, 0, 
-        0,  0,  1,  0, 0);
+        0,  1,  0,  1, 0, 
+        1,  0, -3,  0, 1, 
+        0, -3, -5, -3, 0, 
+        1,  0, -3,  0, 1, 
+        0,  1,  0,  1, 0);
     filter2D(im, im, -1 , kernel, cv::Point(-1, -1), 0, cv::BORDER_DEFAULT );
 
     frontiers.clear();
@@ -2072,16 +2005,22 @@ bool ExplorationPlanner::determine_goal(
       getAdjacentPoints(i, adjacent_points);
 
       bool flag = false;
-      for (int i = 0; i < 8; i++)
+      for (int j = 0; j < 8; j++)
       {
-        if (adjacent_points[i] > 0 && occupancy_grid_array_[adjacent_points[i]] > 50) 
+        if (adjacent_points[j] >= 0 && 
+            occupancy_grid_array_[adjacent_points[j]] > 50) 
+        {
           flag = true;
+        }
+
       }
 
       if (flag)
         continue;
 
-      if (im.data[i] > 0 && occupancy_grid_array_.at(i) != -1 && occupancy_grid_array_.at(i) < 50)
+      if (im.data[i] > 0 && 
+          occupancy_grid_array_.at(i) != -1 && 
+          occupancy_grid_array_.at(i) < 50)
       {
         storeFrontier(
             i % map_width_,
@@ -2093,6 +2032,7 @@ bool ExplorationPlanner::determine_goal(
       }
     }
     visualize_Frontiers();
+
     sort(1);
 
     final_goal->push_back(frontiers.at(0).x_coordinate);

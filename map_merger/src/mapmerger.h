@@ -52,10 +52,12 @@ public:
     MapMerger();
     void start();
     void waitForLocalMetaData();
+    void waitForRobotInformation();
     bool transformPointSRV(map_merger::TransformPoint::Request &req,
                            map_merger::TransformPoint::Response &res);
     bool log_output_srv(map_merger::LogMaps::Request &req,
                         map_merger::LogMaps::Response &res);
+    bool getHasLocalMap();
 private:
     //Private Methods
     //callback methods
@@ -63,6 +65,7 @@ private:
     void callback_map_other(const adhoc_communication::MmMapUpdateConstPtr &msg);
     void callback_control(const adhoc_communication::MmControlConstPtr &msg);
     void callback_map_meta_data_local(const nav_msgs::OccupancyGrid::ConstPtr &msg);
+    void callback_robot_status(const nav_msgs::MapMetaData::ConstPtr &msg);
     void callback_global_pub(const ros::TimerEvent &e);
     void callback_send_map(const ros::TimerEvent &e);
     void callback_send_position(const ros::TimerEvent &e);
@@ -71,6 +74,7 @@ private:
     void callback_got_position_network(const adhoc_communication::MmRobotPosition::ConstPtr &msg);
     void callback_new_robot(const std_msgs::StringConstPtr &msg);
     void callback_ask_other_robots(const ros::TimerEvent &e);
+    void callback_remove_robot(const std_msgs::StringConstPtr &msg);
 
     void callback_write_maps(const ros::TimerEvent &e);
 
@@ -80,9 +84,12 @@ private:
     bool recomputeTransform(int mapDataIndex);
     void makeEmptyMapData(string robot_name,int height,int width,float resolution);
     void mergeMaps(nav_msgs::OccupancyGrid *mapToMerge,int min_x = 0,int min_y = 0,int max_x = -1,int max_y = -1);
+    void callback_got_robot_for_data(const std_msgs::StringConstPtr &msg);
     void sendControlMessage(std::vector<int>* updateNumbers,std::string dest);
 
-    void processLocalMap(nav_msgs::OccupancyGrid * toInsert);
+    void processMap(nav_msgs::OccupancyGrid *map,int index_in_mapdata);
+    void processLocalMap(nav_msgs::OccupancyGrid * toInsert,int index);
+    void processPosition(geometry_msgs::PoseStamped * pose);
 
     void updateMap(nav_msgs::OccupancyGrid *mapToUpdate,int index_of_transform);
     void updateMapArea(int map_index,nav_msgs::OccupancyGrid *newData,bool clear = false);
@@ -90,6 +97,7 @@ private:
     int findRobotIndex(int transform_index);
     void sendMapOverNetwork(string destination,std::vector<int>* containedUpdates,int start_row = 0,int start_collum = 0,int end_row = -1,int end_collum = -1);
     void sendMetaData(float res = 0.05);
+    void sendBackAskedMapData(string robotName, std::vector<int> missingUpdates );
     nav_msgs::OccupancyGrid* getMapPart(int map_index,int start_x,int start_y,int width,int height);
     nav_msgs::OccupancyGrid* matToMap(const cv::Mat mat, nav_msgs::OccupancyGrid *forInfo);
     bool createLogPath();
@@ -106,17 +114,15 @@ private:
     std::vector<cv::Mat>* transforms;
     std::vector<bool>* new_data_maps;
     std::vector<UpdateEntry>* formerUpdates;
+    std::vector<ros::Publisher> *robots_position_publisher;
     ros::Publisher  list_of_positions_publisher;
     //std::vector<adhoc_communication::
-
-    // publishes the other map from the other robot.
-    ros::Publisher other_map_publisher;
-
     adhoc_communication::MmListOfPoints * positions;
     int map_width,map_height,size,
         seconds_meta_timer,seconds_publish_timer,
         seconds_send_timer,seconds_recompute_transform,
-        seconds_send_position, updateCount;
+	seconds_send_position,
+        laser_range,updateCount;
     std::vector<nav_msgs::OccupancyGrid*>* map_data;
     std::vector<UpdateEntry*>* update_list;
     nav_msgs::OccupancyGrid * global_map, * local_map, * local_map_old;
@@ -129,6 +135,7 @@ private:
             force_recompute_all,
             global_map_ready;
 //            convergente;
+    cv::Mat lastTrans;
     ros::Publisher pub;
     geometry_msgs::PoseStamped * cur_position;
     float g_start_x,g_start_y;
@@ -158,7 +165,6 @@ private:
     visualization_msgs::MarkerArray pos_array_my;
     std::vector<int> * pos_seq_other;
     int pos_seq_my;
-    int max_pairwise_distance;
     bool turning;
 };
 

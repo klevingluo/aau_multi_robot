@@ -200,7 +200,6 @@ class Explorer {
          * 3 ... Sort the last 10 entries to shortest TRAVEL PATH
          * 4 ... Sort all cluster elements from nearest to furthest (EUCLIDEAN DISTANCE)
          */
-        ROS_WARN("calling explore");
         frontier_selection = 6;
         if(frontier_selection < 0 || frontier_selection > 6)
         {
@@ -316,16 +315,13 @@ class Explorer {
       tf::Matrix3x3 m(1,0,0,0,1,0,0,0,1);
       tf::Quaternion q;
 
-      for (int i = 0; i < 4; i++)
-      {
-        m.setRPY(0,0,i*3.14/2);
-        m.getRotation(q);
-        navGoal.target_pose.pose.orientation.x = q.getX();
-        navGoal.target_pose.pose.orientation.y = q.getY();
-        navGoal.target_pose.pose.orientation.z = q.getZ();
-        navGoal.target_pose.pose.orientation.w = q.getW();
-        ac.sendGoalAndWait(navGoal, ros::Duration(10));
-      }
+      m.setRPY(0,0,3.14/2);
+      m.getRotation(q);
+      navGoal.target_pose.pose.orientation.x = q.getX();
+      navGoal.target_pose.pose.orientation.y = q.getY();
+      navGoal.target_pose.pose.orientation.z = q.getZ();
+      navGoal.target_pose.pose.orientation.w = q.getW();
+      ac.sendGoalAndWait(navGoal, ros::Duration(15));
 
       if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
       {
@@ -348,11 +344,6 @@ class Explorer {
       pub_Point = nh_Point.advertise < geometry_msgs::PointStamped
         > ("goalPoint", 100, true);
       pub_Point.publish < geometry_msgs::PointStamped > (goalPoint);
-    }
-
-    //returns true if the action succeeded, false on abort, 
-    bool move_robot(int seq, double position_x, double position_y) {
-      return false;
     }
 
     void feedbackCallback(
