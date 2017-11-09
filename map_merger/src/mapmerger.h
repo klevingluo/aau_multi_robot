@@ -57,15 +57,13 @@ public:
                            map_merger::TransformPoint::Response &res);
     bool log_output_srv(map_merger::LogMaps::Request &req,
                         map_merger::LogMaps::Response &res);
-    bool getHasLocalMap();
 private:
     //Private Methods
     //callback methods
     void callback_map(const nav_msgs::OccupancyGrid::ConstPtr& msg);
-    void callback_map_other(const adhoc_communication::MmMapUpdateConstPtr &msg);
+    void callback_map_other(const nav_msgs::OccupancyGridPtr &msg);
     void callback_control(const adhoc_communication::MmControlConstPtr &msg);
     void callback_map_meta_data_local(const nav_msgs::OccupancyGrid::ConstPtr &msg);
-    void callback_robot_status(const nav_msgs::MapMetaData::ConstPtr &msg);
     void callback_global_pub(const ros::TimerEvent &e);
     void callback_send_map(const ros::TimerEvent &e);
     void callback_send_position(const ros::TimerEvent &e);
@@ -74,7 +72,6 @@ private:
     void callback_got_position_network(const adhoc_communication::MmRobotPosition::ConstPtr &msg);
     void callback_new_robot(const std_msgs::StringConstPtr &msg);
     void callback_ask_other_robots(const ros::TimerEvent &e);
-    void callback_remove_robot(const std_msgs::StringConstPtr &msg);
 
     void callback_write_maps(const ros::TimerEvent &e);
 
@@ -87,7 +84,6 @@ private:
     void callback_got_robot_for_data(const std_msgs::StringConstPtr &msg);
     void sendControlMessage(std::vector<int>* updateNumbers,std::string dest);
 
-    void processMap(nav_msgs::OccupancyGrid *map,int index_in_mapdata);
     void processLocalMap(nav_msgs::OccupancyGrid * toInsert,int index);
     void processPosition(geometry_msgs::PoseStamped * pose);
 
@@ -96,8 +92,6 @@ private:
     int findTransformIndex(int robot_index);
     int findRobotIndex(int transform_index);
     void sendMapOverNetwork(string destination,std::vector<int>* containedUpdates,int start_row = 0,int start_collum = 0,int end_row = -1,int end_collum = -1);
-    void sendMetaData(float res = 0.05);
-    void sendBackAskedMapData(string robotName, std::vector<int> missingUpdates );
     nav_msgs::OccupancyGrid* getMapPart(int map_index,int start_x,int start_y,int width,int height);
     nav_msgs::OccupancyGrid* matToMap(const cv::Mat mat, nav_msgs::OccupancyGrid *forInfo);
     bool createLogPath();
@@ -137,6 +131,7 @@ private:
 //            convergente;
     cv::Mat lastTrans;
     ros::Publisher pub;
+    ros::Publisher other_map_pub;
     geometry_msgs::PoseStamped * cur_position;
     float g_start_x,g_start_y;
     double max_trans_robot,max_rotation_robot;

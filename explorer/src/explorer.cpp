@@ -247,7 +247,9 @@ class Explorer {
           ROS_INFO("Doing navigation to goal");
           if(navigate(final_goal))
           {
-            exploration->calculate_travel_path(exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).x_coordinate, exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).y_coordinate);
+            exploration->calculate_travel_path(
+                exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).x_coordinate, 
+                exploration->visited_frontiers.at(exploration->visited_frontiers.size()-1).y_coordinate);
           } else 
           {
             ROS_WARN("failed to navigate: Storing unreachable frontier with id:");

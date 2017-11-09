@@ -2035,10 +2035,12 @@ bool ExplorationPlanner::determine_goal(
 
     sort(1);
 
-    final_goal->push_back(frontiers.at(0).x_coordinate);
-    final_goal->push_back(frontiers.at(0).y_coordinate);
-    final_goal->push_back(frontiers.at(0).detected_by_robot);
-    final_goal->push_back(frontiers.at(0).id);
+    int frontier = (int)(50 * rand() / RAND_MAX);
+
+    final_goal->push_back(frontiers.at(frontier).x_coordinate);
+    final_goal->push_back(frontiers.at(frontier).y_coordinate);
+    final_goal->push_back(frontiers.at(frontier).detected_by_robot);
+    final_goal->push_back(frontiers.at(frontier).id);
 
     robot_str_name->push_back(frontiers.at(0).detected_by_robot_str);
     return true;
