@@ -33,8 +33,6 @@
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
 
-#define MAX_DISTANCE 2000			      // max distance to starting point
-#define MAX_GOAL_RANGE 0.2			    // min distance between frontiers (search)
 #define MAX_NEIGHBOR_DIST 0.30	    // radius (in cells) around selected goal without obstacles
 
 using namespace explorationPlanner;
@@ -64,7 +62,6 @@ ExplorationPlanner::ExplorationPlanner(int robot_id, bool robot_prefix_empty, st
   other_robots_position_y(0),
   number_of_completed_auctions(0), 
   number_of_uncompleted_auctions(0), 
-  first_run(true),
   first_negotiation_run(true), 
   robot_prefix_empty_param(false)
 {
@@ -411,6 +408,7 @@ bool ExplorationPlanner::storeFrontier(
     int x, 
     int y, 
     int map_index,
+    int value,
     int detected_by_robot, 
     std::string detected_by_robot_str, 
     int id) 
@@ -432,6 +430,7 @@ bool ExplorationPlanner::storeFrontier(
   new_frontier.mapx = x + (int)(map_origin_.position.x);
   new_frontier.mapy = y + (int)(map_origin_.position.y);
   new_frontier.map_index = map_index;
+  new_frontier.value = value;
 
   store_frontier_mutex.lock(); 
   frontiers.push_back(new_frontier);
@@ -912,14 +911,11 @@ void ExplorationPlanner::auctionCallback(
      * periodically update the frontiers in the frontier thread.  
      */
     transformToOwnCoordinates_frontiers();
-
     clearUnreachableFrontiers();
-
     clusterFrontiers();
 
     if(msg.get()->auction_status_message == true)
     { 
-
       auction_start = msg.get()->start_auction;
       auction_finished = msg.get()->auction_finished;
       adhoc_communication::ExpCluster occupied_ids;
@@ -936,10 +932,8 @@ void ExplorationPlanner::auctionCallback(
         for(int i = 0; i < msg.get()->occupied_ids.size(); i++)
         {
           adhoc_communication::ExpClusterElement cluster_element; 
-
           cluster_element.id = msg.get()->occupied_ids.at(i).id; 
           cluster_element.detected_by_robot_str = msg.get()->occupied_ids.at(i).detected_by_robot_str;
-
           occupied_ids.ids_contained.push_back(cluster_element);
         }
         int occupied_cluster_id = checkClustersID(occupied_ids);   
@@ -949,7 +943,7 @@ void ExplorationPlanner::auctionCallback(
         {
           ROS_INFO("Adding occupied cluster: %d", occupied_cluster_id);
           already_used_ids.push_back(occupied_cluster_id);
-        }else
+        } else
         {
           /* Store undetected Clusters in a struct for later processing */
           ROS_INFO("Adding occupied cluster as unrecognized!");
@@ -973,7 +967,6 @@ void ExplorationPlanner::auctionCallback(
               i--;
           }
         }
-
 
         /*
          * Grep the requested clusters to know which ones to answer to. 
@@ -1280,6 +1273,7 @@ void ExplorationPlanner::findFrontiers() {
         allFrontiers.at(i) % map_width_,
         allFrontiers.at(i) / map_width_,
         allFrontiers.at(i),
+        0,
         robot_name,
         robot_str,
         -1);
@@ -1435,7 +1429,6 @@ bool ExplorationPlanner::auctioning(
 
   sendToMulticastAuction("mc_", auction_msg, "auction");
 
-  first_run = false; 
   auction_id_number++;
 
   ROS_INFO("return %d", cluster_selected_flag);
@@ -1987,15 +1980,12 @@ bool ExplorationPlanner::determine_goal(
     }
     for (int i = 0; i < frontiers.size(); i++)
     {
-        im.data[frontiers.at(i).map_index] = 255;
+      im.data[frontiers.at(i).map_index] = 255;
     }
 
-    cv::Mat kernel = (cv::Mat_<double>(5,5) << 
-        0,  1,  0,  1, 0, 
-        1,  0, -3,  0, 1, 
-        0, -3, -5, -3, 0, 
-        1,  0, -3,  0, 1, 
-        0,  1,  0,  1, 0);
+    cv::Mat kernel = (cv::getGaussianKernel(39, 0) * -1 + 0.01);
+    cv::normalize(kernel, kernel);
+
     filter2D(im, im, -1 , kernel, cv::Point(-1, -1), 0, cv::BORDER_DEFAULT );
 
     frontiers.clear();
@@ -2018,55 +2008,58 @@ bool ExplorationPlanner::determine_goal(
       if (flag)
         continue;
 
-      if (im.data[i] > 0 && 
+      if (im.data[i] > 10.33 && 
           occupancy_grid_array_.at(i) != -1 && 
-          occupancy_grid_array_.at(i) < 50)
+          occupancy_grid_array_.at(i) < 100 &&
+          i % 5 == 1
+         )
       {
         storeFrontier(
             i % map_width_,
             i / map_width_,
             i,
+            im.data[i],
             robot_name,
             robot_str,
             -1);
       }
     }
+    clearUnreachableFrontiers();
     visualize_Frontiers();
 
     sort(1);
 
-    int frontier = (int)(50 * rand() / RAND_MAX);
-
-    final_goal->push_back(frontiers.at(frontier).x_coordinate);
-    final_goal->push_back(frontiers.at(frontier).y_coordinate);
-    final_goal->push_back(frontiers.at(frontier).detected_by_robot);
-    final_goal->push_back(frontiers.at(frontier).id);
-
+    final_goal->push_back(frontiers.at(0).x_coordinate);
+    final_goal->push_back(frontiers.at(0).y_coordinate);
+    final_goal->push_back(frontiers.at(0).detected_by_robot);
+    final_goal->push_back(frontiers.at(0).id);
     robot_str_name->push_back(frontiers.at(0).detected_by_robot_str);
     return true;
   }
   return false;
 }
 
+float euclidDist(float x1, float x2, float y1, float y2)
+{
+  float xDist = x2 - x1;
+  float yDist = y2 - y1;
+  return xDist*xDist + yDist*yDist;
+}
+
 void ExplorationPlanner::sort(int strategy)
 {
+
+  double xCoor = odom->pose.pose.position.x;
+  double yCoor = odom->pose.pose.position.y;
+
   if(strategy == 1 || strategy == 2)
   {
-      
-    double xCoor = odom->pose.pose.position.x;
-    double yCoor = odom->pose.pose.position.y;
-
     std::sort(
         frontiers.begin(), 
         frontiers.end(), 
         [xCoor, yCoor] (frontier_t front1, frontier_t front2) {
-          double x = front1.x_coordinate - xCoor;
-          double y = front1.y_coordinate - yCoor;
-          double x_next = front2.x_coordinate - xCoor;
-          double y_next = front2.y_coordinate - yCoor;
-          double euclidean_distance = x * x + y * y;
-          double euclidean_distance_next = x_next * x_next + y_next * y_next;
-          return euclidean_distance < euclidean_distance_next;
+        return euclidDist(xCoor, front1.x_coordinate, yCoor, front1.y_coordinate) < 
+        euclidDist(xCoor, front2.x_coordinate, yCoor, front2.y_coordinate);
         });
   }
   else if(strategy == 3)
@@ -2079,38 +2072,24 @@ void ExplorationPlanner::sort(int strategy)
   }
   else if(strategy == 4)
   {
-    double pose_x = odom->pose.pose.position.x;
-    double pose_y = odom->pose.pose.position.y;
-
     for(int cluster_number = 0; cluster_number < clusters.size(); cluster_number++)
     {
       std::sort(
           clusters.at(cluster_number).cluster_element.begin(), 
           clusters.at(cluster_number).cluster_element.end(), 
-          [pose_x, pose_y] (frontier_t front1, frontier_t front2) {
-            double x = front1.x_coordinate - pose_x;
-            double y = front1.y_coordinate - pose_y;
-            double x_next = front2.x_coordinate - pose_x;
-            double y_next = front2.y_coordinate - pose_y;
-            double euclidean_distance = x * x + y * y;
-            double euclidean_distance_next = x_next * x_next + y_next * y_next;
-            return euclidean_distance < euclidean_distance_next;
+          [xCoor, yCoor] (frontier_t front1, frontier_t front2) {
+          return euclidDist(xCoor, front1.x_coordinate, yCoor, front1.y_coordinate) < 
+          euclidDist(xCoor, front2.x_coordinate, yCoor, front2.y_coordinate);
           });
     }
     std::sort(
         clusters.begin(), 
         clusters.end(), 
-        [pose_x, pose_y] (cluster_t clus1, cluster_t clus2) {
-          double x = clus1.cluster_element.at(0).x_coordinate - pose_x;
-          double y = clus1.cluster_element.at(0).y_coordinate - pose_y;
-          double x_next = clus2.cluster_element.at(0).x_coordinate - pose_x;
-          double y_next = clus2.cluster_element.at(0).y_coordinate - pose_y;
-          double euclidean_distance = x * x + y * y;
-          double euclidean_distance_next = x_next * x_next + y_next * y_next;
-          return euclidean_distance < euclidean_distance_next;
-    });
+        [xCoor, yCoor] (cluster_t clus1, cluster_t clus2) {
+        return euclidDist(xCoor, clus1.cluster_element.at(0).x_coordinate, yCoor, clus1.cluster_element.at(0).y_coordinate) < 
+        euclidDist(xCoor, clus2.cluster_element.at(0).x_coordinate, yCoor, clus2.cluster_element.at(0).y_coordinate);
+        });
   }
-
   ROS_INFO("Done sorting");
 }
 
@@ -2154,7 +2133,6 @@ void ExplorationPlanner::simulate() {
 
 void ExplorationPlanner::visualize_Frontiers()
 {
-
   // action 3: delete all markers
   visualization_msgs::Marker deleteall;
   deleteall.action = 3;
@@ -2172,6 +2150,7 @@ void ExplorationPlanner::visualize_Frontiers()
     visualization_msgs::Marker marker = createMarker();
     marker.pose.position.x = frontiers.at(i).x_coordinate;
     marker.pose.position.y = frontiers.at(i).y_coordinate;
+    marker.color.r = frontiers.at(i).value/255.0;
     markerArray.markers.push_back(marker);
   }
 
@@ -2219,7 +2198,7 @@ inline visualization_msgs::Marker ExplorationPlanner::createMarker() {
 
   marker.color.a = 1.0;
   marker.color.r = 1.0;
-  marker.color.g = 0.0;
+  marker.color.g = 1.0;
   marker.color.b = 0.0;               
 
   return marker;

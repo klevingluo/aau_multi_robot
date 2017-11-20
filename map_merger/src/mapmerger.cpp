@@ -261,13 +261,13 @@ void MapMerger::callback_global_pub(const ros::TimerEvent &e)
   }
   if(transforms->size() != map_data->size() && local_map != NULL )
   {
-    for(int i = 0; i < robots->size(); i++)
+    for(size_t i = 0; i < robots->size(); i++)
     {
       if(findTransformIndex(i) == -1 && new_data_maps->at(i) == true)
       {
         //here is something terrible wrong
         //todo fix it.
-        ROS_DEBUG("Computing Transform, robotIndex:%i",i);
+        ROS_DEBUG("Computing Transform, robotIndex: %lu",i);
         computeTransform(0);
         //here draw if debug
       }

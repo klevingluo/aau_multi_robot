@@ -32,6 +32,7 @@ namespace explorationPlanner
         int mapx;
         int mapy;
         int map_index;
+        int value;
         double robot_home_x; 
         double robot_home_y;
         double x_coordinate;
@@ -159,7 +160,7 @@ namespace explorationPlanner
       ros::ServiceClient ssendFrontier, ssendAuction;
 
       std::string trajectory_strategy;
-      bool first_run, first_negotiation_run;
+      bool first_negotiation_run;
 
       int number_of_auction_runs;
       int cluster_id, cluster_cells_seq_number;
@@ -216,7 +217,7 @@ namespace explorationPlanner
       void visualizeClustersConsole();
       void findFrontiers();
       void clearUnreachableFrontiers();
-      bool storeFrontier(int x, int y, int map_index, int detected_by_robot, std::string detected_by_robot_str, int id);
+      bool storeFrontier(int x, int y, int map_index, int detected_by_robot, int value, std::string detected_by_robot_str, int id);
       bool storeVisitedFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
       bool storeUnreachableFrontier(double x, double y, int detected_by_robot, std::string detected_by_robot_str, int id);
       bool removeStoredFrontier(int id, std::string detected_by_robot_str);
