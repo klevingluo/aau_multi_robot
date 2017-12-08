@@ -202,6 +202,10 @@ void MapMerger::callback_control(const adhoc_communication::MmControlConstPtr &m
   }
   else
     ROS_DEBUG("Map sending service unavailable");
+
+  //also send the location
+  ROS_WARN("sending location over network");
+  sendLocationOverNetwork(tmp.src_robot.c_str());
 }
 
 void MapMerger::callback_map_meta_data_local(const nav_msgs::OccupancyGrid::ConstPtr &msg)
@@ -487,9 +491,9 @@ void MapMerger::callback_send_map(const ros::TimerEvent &e)
      sendMapOverNetwork(robots->at(i),containedUpdates,min_x,min_y,max_x,max_y);
      */
   sendMapOverNetwork("mc_" + robot_name,containedUpdates,min_x,min_y,max_x,max_y);
+
+
   delete containedUpdates;
-  //sendMapOverNetwork("",min_x,min_y,max_x,max_y);
-  //send_map_over_network("");
   ROS_DEBUG("Sended local map over network,adding updateentry for update number:%i\n\t\t\tminx:%i\tmaxx:%i\tminy:%i\tmaxy:%i",local_map->header.seq,min_x,max_x,min_y,max_y);
   update_list->push_back(new UpdateEntry(update_seq,min_x,min_y,max_x,max_y));
   update_seq++;
@@ -529,125 +533,16 @@ void MapMerger::callback_send_map(const ros::TimerEvent &e)
   std::copy(local_map->data.begin(),local_map->data.end(),local_map_old->data.begin());
 }
 
-void MapMerger::callback_got_position_network(const adhoc_communication::MmRobotPosition::ConstPtr &msg)
+void MapMerger::callback_got_position_network(
+    const adhoc_communication::MmRobotPosition::ConstPtr &msg)
 {
   geometry_msgs::PoseStamped tmp = msg.get()->position;
   std::string source_host = msg.get()->src_robot;
-  for(int i = 0; i < robots->size(); i++)
-  {
-    std::string name = robots->at(i);
-    if(name == source_host)
-    {
-      bool addNew = true;
-      for(int j = 0; j < positions->positions.size(); j++)
-      {
-        if(positions->positions.at(j).src_robot == source_host)
-        {
-          ROS_DEBUG("Updating Position point for %s",name.c_str());
-          addNew = false;
-          adhoc_communication::MmPoint  newPosition = positions->positions.at(j);
-          int index_transform = findTransformIndex(i);
-          if(transforms->size() == 0)
-          {
-            ROS_WARN("no transformation for %s, position is not published",name.c_str());
-            return;
-          }
-          cv::Mat trans = transforms->at(index_transform);
-          cv::Point org_point(map_width / 2 +tmp.pose.position.x / 0.05,
-              map_height / 2 +tmp.pose.position.y / 0.05);
-          cv::Point homogeneous;
-          std::vector<cv::Point> inPts,outPts;
-          inPts.push_back(org_point);
-          outPts.push_back(homogeneous);
-          cv::Size s;
-          s.height = map_height; //* 0.05;
-          s.width = map_width ;//* 0.05;
 
-          cv::transform(inPts,outPts,trans);
-
-          newPosition.x = (outPts.at(0).x - map_width / 2) * 0.05;
-          newPosition.y = (outPts.at(0).y - map_height / 2) * 0.05;
-          positions->positions.at(j) = newPosition;
-
-          ROS_DEBUG("Publish other position,j:%i",j);
-          visualization_msgs::Marker m;
-          m.header.frame_id = local_map_frame_id;
-          m.header.stamp = ros::Time::now();
-          m.pose.position.x = newPosition.x;
-          m.pose.position.y = newPosition.y;
-          m.pose.position.z = 0;
-
-          m.scale.x = 0.2;
-          m.scale.y = 0.2;
-          m.scale.z = 0.2;
-
-
-          m.type = visualization_msgs::Marker::SPHERE;
-          m.action = visualization_msgs::Marker::ADD;
-          m.pose.orientation.x = 0.0;
-          m.pose.orientation.y = 0.0;
-          m.pose.orientation.z = 0.0;
-          m.pose.orientation.w = 1.0;
-          m.header.seq = pos_seq_other->at(j);
-          m.id = pos_seq_other->at(j);
-          pos_seq_other->at(j)++;
-          m.color.a = 1.0;
-          if(i == 0)
-            m.color.b = 1.0;
-          if(i == 1)
-            m.color.g = 1.0;
-          if(i == 2)
-          {
-            m.color.g = 1;
-            m.color.b = 1;
-          }
-
-          pos_array_other->at(j).markers.push_back(m);
-          pos_pub_other->at(j).publish<visualization_msgs::MarkerArray>(pos_array_other->at(j));
-        }
-      }
-      if(addNew)
-      {
-        ROS_DEBUG("Adding new Position point for %s",name.c_str());
-        adhoc_communication::MmPoint newPosition;// ();
-        newPosition.src_robot = source_host;
-        ROS_DEBUG("find trans");
-        int index_transform = findTransformIndex(i);
-        ROS_DEBUG("finished find trans");
-        if(transforms->size() == 0 );
-        {
-          ROS_WARN("no transformation for %s, position is not published,index:%u, size:%lu",name.c_str(),index_transform,transforms->size());
-        }
-        if( index_transform > transforms->size())
-        {
-          //ROS_WARN("Index:%u,size:%lu",index_transform,transforms->size());
-          return;
-        }
-        ROS_DEBUG("get transform");
-        cv::Mat trans = transforms->at(index_transform);
-        cv::Point org_point(map_width / 2 +tmp.pose.position.x / 0.05,
-            map_height / 2 +tmp.pose.position.y / 0.05);
-        cv::Point homogeneous;
-        ROS_DEBUG("got transform");
-        std::vector<cv::Point> inPts,outPts;
-        inPts.push_back(org_point);
-        outPts.push_back(homogeneous);
-        cv::Size s;
-        s.height = map_height; //* 0.05;
-        s.width = map_width ;//* 0.05;
-
-        cv::transform(inPts,outPts,trans);
-
-        newPosition.x = (outPts.at(0).x - map_width / 2) * 0.05;
-        newPosition.y = (outPts.at(0).y - map_height / 2) * 0.05;
-        positions->positions.push_back(newPosition);
-      }
-
-      list_of_positions_publisher.publish(*positions);
-    }
-
-  }
-  return;
+  ROS_INFO("got a position from: %s", source_host.c_str());
+  other_pos_pub = nodeHandle->advertise<geometry_msgs::PoseStamped>
+    (robot_prefix + "/other_positions/" + robot_name + "/position", 3);
+  other_pos_pub.publish(tmp);
 }
 
 void MapMerger::callback_got_position(const nav_msgs::Odometry::ConstPtr &msg)
@@ -1177,7 +1072,36 @@ void MapMerger::makeEmptyMapData(string robot_name,int height,int width,float re
   }
 }
 
-void MapMerger::sendMapOverNetwork(string destination, std::vector<int>* containedUpdates, int start_row, int start_collum, int end_row, int end_collum)
+void MapMerger::sendLocationOverNetwork(std::string destination) {
+  ros::ServiceClient client = 
+    nodeHandle->serviceClient<adhoc_communication::SendMmRobotPosition>
+    (robot_prefix + "/adhoc_communication/send_position");
+  adhoc_communication::SendMmRobotPosition exchange;
+  exchange.request.topic = position_other_robots_topic;
+  exchange.request.dst_robot = destination;
+  exchange.request.position.position.pose = cur_position->pose;
+  exchange.request.position.src_robot = robot_name;
+
+  if(!client.call(exchange))
+  {
+  ROS_DEBUG("Could not call service to send map");
+  return;
+  }
+
+  if(!exchange.response.status) {
+      ROS_WARN("Destination host unreachable [%s](if nothing -> boradcast)",
+          destination.c_str());
+    return;
+  }
+}
+
+void MapMerger::sendMapOverNetwork(
+    string destination, 
+    std::vector<int>* containedUpdates, 
+    int start_row, 
+    int start_collum,
+    int end_row,
+    int end_collum)
 {
   //ros::nodeHandle nodeHandle ("~");
   ros::ServiceClient client;

@@ -92,6 +92,7 @@ private:
     int findTransformIndex(int robot_index);
     int findRobotIndex(int transform_index);
     void sendMapOverNetwork(string destination,std::vector<int>* containedUpdates,int start_row = 0,int start_collum = 0,int end_row = -1,int end_collum = -1);
+    void sendLocationOverNetwork(string destination);
     nav_msgs::OccupancyGrid* getMapPart(int map_index,int start_x,int start_y,int width,int height);
     nav_msgs::OccupancyGrid* matToMap(const cv::Mat mat, nav_msgs::OccupancyGrid *forInfo);
     bool createLogPath();
@@ -132,6 +133,7 @@ private:
     cv::Mat lastTrans;
     ros::Publisher pub;
     ros::Publisher other_map_pub;
+    ros::Publisher other_pos_pub;
     geometry_msgs::PoseStamped * cur_position;
     float g_start_x,g_start_y;
     double max_trans_robot,max_rotation_robot;
