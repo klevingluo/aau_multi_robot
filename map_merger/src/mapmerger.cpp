@@ -1,10 +1,8 @@
-#include "mapmerger.h"
-#include "numeric"
-#include "unistd.h"
-#include <boost/filesystem.hpp>
 #include <fstream>
 #include <cerrno>
-#include "adhoc_communication/MmPoint.h"
+#include <boost/filesystem.hpp>
+#include "unistd.h"
+#include "mapmerger.h"
 #include "adhoc_communication/MmPoint.h"
 
 MapMerger::MapMerger()
@@ -1082,15 +1080,16 @@ void MapMerger::sendLocationOverNetwork(std::string destination) {
   exchange.request.position.position.pose = cur_position->pose;
   exchange.request.position.src_robot = robot_name;
 
-  if(!client.call(exchange))
-  {
-  ROS_DEBUG("Could not call service to send map");
-  return;
+  exchange.request.position.position.header.frame_id = robot_name + "/map";
+
+  if(!client.call(exchange)) {
+    ROS_DEBUG("Could not call service to send map");
+    return;
   }
 
   if(!exchange.response.status) {
-      ROS_WARN("Destination host unreachable [%s](if nothing -> boradcast)",
-          destination.c_str());
+    ROS_WARN("Destination host unreachable [%s](if nothing -> boradcast)",
+        destination.c_str());
     return;
   }
 }
